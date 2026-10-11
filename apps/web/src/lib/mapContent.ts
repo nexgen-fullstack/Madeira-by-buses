@@ -27,6 +27,10 @@ export interface MapLine {
   board?: number;
   /** Where a tap on it goes (another trail met on the way: its page). */
   href?: string;
+  /** A walk with a view (along the sea): on a wider band. */
+  view?: boolean;
+  /** Told to `MapContent.onLine` when tapped or held (a trail added to a walk, or not yet). */
+  key?: string;
 }
 
 export interface LineNote {
@@ -68,9 +72,9 @@ export interface MapPoint extends LatLon {
 export type FlagMode = 'walk' | 'bus' | 'car' | 'bike' | 'trail';
 
 /**
- * A flag of a way: a bus's in the colour of its line with its number (a start flag of
- * that colour, a chequered one of that colour and black), the others green and chequered
- * black and white with a walker, a car, a bike or a hiker in the way's colour.
+ * A flag of a way, in the colour its line is drawn in: the start flag of that colour, the
+ * chequered one of that colour and black (or white, by a dark colour); a bus's with its
+ * number, the others with a walker, a car, a bike or a hiker on a white disc.
  */
 export interface FlagLook {
   mode: FlagMode;
@@ -96,6 +100,11 @@ export interface MapContent {
    * the app opens. The first ones stay when they crowd each other far out.
    */
   scenic?: ScenicSpot[];
+  /**
+   * A line with a `key` tapped (`held`: a finger held on it): what the screen does with it,
+   * and a word to show, if any.
+   */
+  onLine?: (key: string, held: boolean) => LineNote | undefined;
   /** Where the buses shown run on the Via Rápida: a violet band under them, named. */
   expressways?: LatLon[][];
 }
@@ -154,6 +163,12 @@ export const RUN_WIDTH = 4.5;
 /** A walk on the map, in navy; one with a view (along the sea), in the deep cyan of the logo's wave. */
 export const WALK_INK = '#002F85';
 export const VIEW_WALK = '#00838F';
+/**
+ * Each walk of a route in a colour of its own, as each bus is: blue, violet, green, red,
+ * brown — none of them a bus's neon, so a walk and a ride never look alike.
+ */
+export const WALK_COLORS = ['#1E6FFF', '#8E24AA', '#00A152', '#E53935', '#795548'];
+export const walkColor = (walk: number) => WALK_COLORS[walk % WALK_COLORS.length]!;
 
 /**
  * A start flag (or a chequered one, `finish`) at `p` of a way gone as `look` says, with the
@@ -218,6 +233,7 @@ export function itineraryContent(
     return expresswayLanes(net, leg.pattern, stops[leg.boardPos], stops[leg.alightPos]);
   });
   let ride = 0;
+  let walk = 0;
   it.legs.forEach((leg, i) => {
     if (leg.kind === 'walk') {
       // Along the pavements when the walking network is loaded, to the very spot of the bus.
@@ -225,9 +241,10 @@ export function itineraryContent(
       const to = rides[i + 1]?.[0];
       const path = walkPath(leg);
       const coords = [...(from ? [from] : []), ...path, ...(to ? [to] : [])];
-      const color = hasView(leg) ? VIEW_WALK : WALK_INK;
-      lines.push({ coords, color, dashed: true });
-      // A walk, as a bus, from a start flag to a chequered one, each with a walker: where the
+      const color = walkColor(walk++);
+      lines.push({ coords, color, dashed: true, ...(hasView(leg) ? { view: true } : {}) });
+      // A walk, as a bus, from a start flag to a chequered one in its colour, each with a
+      // walker, the next walk in another colour: where the
       // journey starts on foot, where it is walked on from the bus, and where it ends; the
       // names of the places walked from and to (a stop's name stands at its bus's flag).
       const ends = i === 0 || i === it.legs.length - 1;
@@ -337,7 +354,8 @@ export const BIKE_GREEN = '#1E8A4C';
 export function travelContent(travel: Travel, names?: { from?: string; to?: string }): MapContent {
   const first = travel.path[0]!;
   const last = travel.path[travel.path.length - 1]!;
-  const color = travel.mode === 'walk' ? WALK_INK : travel.mode === 'car' ? CAR_BLUE : BIKE_GREEN;
+  const color =
+    travel.mode === 'walk' ? walkColor(0) : travel.mode === 'car' ? CAR_BLUE : BIKE_GREEN;
   const lines: MapLine[] =
     travel.mode === 'walk'
       ? [{ coords: travel.path, color, dashed: true }]

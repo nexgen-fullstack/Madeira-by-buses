@@ -11,7 +11,7 @@ import {
   routeContent,
   RUN_WIDTH,
   travelContent,
-  WALK_INK,
+  WALK_COLORS,
   WAY_TURQUOISE,
   WAY_YELLOW,
 } from './mapContent.ts';
@@ -287,15 +287,18 @@ describe('a route on the map', () => {
       // And ends at a chequered one at the beach: no pin over it.
       ['alight', 'Praia', undefined],
     ]);
-    // The walks' flags with a walker, the bus's in its colour with its number.
+    // Each walk's flags in its own colour with a walker, the bus's in its colour with its
+    // number; each walk drawn in its colour.
     expect(flags.map((p) => p.flag)).toEqual([
-      { mode: 'walk', color: WALK_INK },
-      { mode: 'walk', color: WALK_INK },
+      { mode: 'walk', color: WALK_COLORS[0] },
+      { mode: 'walk', color: WALK_COLORS[0] },
       { mode: 'bus', color: RIDE_COLORS[0], text: '207' },
       { mode: 'bus', color: RIDE_COLORS[0], text: '207' },
-      { mode: 'walk', color: WALK_INK },
-      { mode: 'walk', color: WALK_INK },
+      { mode: 'walk', color: WALK_COLORS[1] },
+      { mode: 'walk', color: WALK_COLORS[1] },
     ]);
+    expect(WALK_COLORS[0]).not.toBe(WALK_COLORS[1]);
+    expect(c.lines.filter((l) => l.dashed).map((l) => l.color)).toEqual(WALK_COLORS.slice(0, 2));
     // Each place's name told on a held finger, where the map does not write it.
     expect(flags[1]!.name).toBe('Funchal');
     expect(c.points.some((p) => p.kind === 'destination' || p.kind === 'origin')).toBe(false);

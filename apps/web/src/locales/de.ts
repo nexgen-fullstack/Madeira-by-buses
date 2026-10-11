@@ -515,5 +515,10 @@ export const de: Dict = {
   'hike.reverseLoop': 'In die andere Richtung gehen',
   'hike.branches': 'Abzweigende Wege',
   'hike.branchesNote':
-    'Jeder in eigener Farbe auf der Karte: grüne Fahne, wo er abzweigt, Zielflagge, wo er endet. Tippen, um ihn zu wählen.',
+    'Ein Tippen auf einen Weg auf der Karte oder hier fügt ihn der Wanderung hinzu; langes Drücken auf der Karte entfernt ihn.',
+  'hike.tapToAdd': 'Tippen, um ihn hinzuzufügen',
+  'hike.holdToRemove': 'Zur Wanderung hinzugefügt. Lange drücken zum Entfernen',
+  'hike.startFrom': 'Start bei:',
+  'hike.withAdded': 'Mit den hinzugefügten: {km} km · ≈ {time}',
+  'hike.open': 'Weg „{name}“ öffnen',
 };

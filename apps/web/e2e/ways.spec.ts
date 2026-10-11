@@ -87,3 +87,31 @@ test('the hiking trails: by kind and region, each with its buses, on the map', a
   await page.getByRole('link', { name: 'Налаштування' }).click();
   await expect(page).toHaveURL(/#\/settings/);
 });
+
+test('another trail met is added to the walk and taken off again', async ({ page }) => {
+  // The promenade from Praia Formosa to Câmara de Lobos, walked from Praia Formosa.
+  await page.goto('./#/hikes/osm-2232229?rev=1');
+  await raiseSheet(page);
+  const promenade = page.locator('.hike-branch').first();
+  await expect(promenade).toContainText('Passeio Público Marítimo');
+  await expect(promenade).toHaveAttribute('aria-pressed', 'false');
+  await promenade.click();
+  await expect(page).toHaveURL(/add=osm-2223213\.0/);
+  await expect(promenade).toHaveAttribute('aria-pressed', 'true');
+  // The walk may now start at either trail's start, and is longer.
+  await expect(page.locator('.hike__starts .chip')).toHaveCount(2);
+  await expect(page.getByText(/Разом із доданими: \d/)).toBeVisible();
+  await promenade.click();
+  await expect(promenade).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.hike__starts')).toHaveCount(0);
+});
+
+test('where you are can be the end of a trip too', async ({ page }) => {
+  await page.goto('./#/plan');
+  await raiseSheet(page);
+  for (const field of ['.plan__from', '.plan__to']) {
+    await expect(
+      page.locator(field).getByRole('button', { name: 'Моє місцезнаходження' }),
+    ).toBeVisible();
+  }
+});

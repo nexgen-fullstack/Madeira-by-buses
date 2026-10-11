@@ -195,6 +195,9 @@ function toGeoJson(content: MapContent) {
           pattern: l.pattern ?? -1,
           board: l.board ?? -1,
           href: l.href ?? '',
+          view: l.view ?? l.color === VIEW_WALK,
+          walkDot: walkDotId(l.color),
+          key: l.key ?? '',
         },
         geometry: { type: 'LineString' as const, coordinates: l.coords.map((c) => [c.lon, c.lat]) },
       })),
@@ -455,11 +458,11 @@ function fitFont(ctx: CanvasRenderingContext2D, text: string, width: number, max
 /**
  * A flag as in Formula 1, its pole at the bottom corner standing on the stop: the start
  * flag (cloth to the right), the chequered one where the way ends (cloth to the left), so
- * that where one way ends and the next starts the two stand side by side. A bus's start
- * flag is of its line's colour with its number, its chequered one of that colour and black
- * with its number large in the middle; the others' start flag green, the chequered one
- * black and white, with a walker, a hiker, a car or a bike in the way's colour on a white
- * disc. Without a `look`, plain.
+ * that where one way ends and the next starts the two stand side by side. Each in the
+ * colour its way is drawn in: the start flag of that colour, the chequered one of that
+ * colour and black (a dark colour and white); a bus's with its number (large in the middle
+ * of the chequered one), the others with a walker, a hiker, a car or a bike in the way's
+ * colour on a white disc. Without a `look`, plain: green, and black and white.
  */
 function flagImage(finish: boolean, look?: FlagLook): ImageData | undefined {
   return canvasImage(FLAG_W, FLAG_H, (ctx) => {
@@ -485,15 +488,16 @@ function flagImage(finish: boolean, look?: FlagLook): ImageData | undefined {
       const rows = 4;
       const cw = cloth.w / cols;
       const ch = cloth.h / rows;
-      // A bus's in its colour and black; the others' black and white.
-      const light = bus ? look.color : '#ffffff';
+      // In its colour and black, or white by a dark colour; plain, black and white.
+      const own = look?.color ?? '#ffffff';
+      const other = !look || bus || luminance(own) > 0.25 ? FLAG_INK : '#ffffff';
       for (let r = 0; r < rows; r++)
         for (let c = 0; c < cols; c++) {
-          ctx.fillStyle = (r + c) % 2 ? light : FLAG_INK;
+          ctx.fillStyle = (r + c) % 2 ? own : other;
           ctx.fillRect(cloth.x + c * cw, cloth.y + r * ch, cw, ch);
         }
     } else {
-      ctx.fillStyle = bus ? look.color : FLAG_GREEN;
+      ctx.fillStyle = look?.color ?? FLAG_GREEN;
       ctx.fillRect(cloth.x, cloth.y, cloth.w, cloth.h);
     }
     ctx.strokeStyle = FLAG_INK;
@@ -601,16 +605,28 @@ function addPlates(map: MapLibreMap, content: MapContent) {
 }
 
 /** A step of a walk: a white dot in a bright blue ring, on any map. */
-function walkDotImage(): ImageData | undefined {
+function walkDotImage(color = '#1E6FFF'): ImageData | undefined {
   return canvasImage(24, 24, (ctx) => {
     ctx.beginPath();
     ctx.arc(12, 12, 8, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
     ctx.lineWidth = 4;
-    ctx.strokeStyle = '#1E6FFF';
+    ctx.strokeStyle = color;
     ctx.stroke();
   });
+}
+
+/** The steps of a walk in its colour, one image for each colour of walk. */
+const walkDotId = (color: string) => `mb-walk-dot-${color.replace('#', '').toLowerCase()}`;
+
+/** Puts on the map the steps of the colours its walks are in. */
+function addWalkDots(map: MapLibreMap, content: MapContent) {
+  for (const l of content.lines) {
+    if (!l.dashed || map.hasImage(walkDotId(l.color))) continue;
+    const image = walkDotImage(l.color);
+    if (image) map.addImage(walkDotId(l.color), image, { pixelRatio: 2 });
+  }
 }
 
 function addOverlay(map: MapLibreMap, base: BaseLayer) {
@@ -765,13 +781,14 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
     id: 'mb-line-hit',
     type: 'line',
     source: 'mb-lines',
-    filter: ['>=', ['get', 'route'], 0],
+    // A bus's line, or one the screen takes taps on (another trail met on a trail's way).
+    filter: ['any', ['>=', ['get', 'route'], 0], ['!=', ['get', 'key'], '']],
     layout: { 'line-cap': 'round' },
     paint: { 'line-color': '#000000', 'line-width': HIT_WIDTH, 'line-opacity': 0 },
   });
-  // A walk: a faint band along the pavements with small bright dots close together on it;
-  // a walk with a view, along the sea, on a band of the logo's cyan wave.
-  const view: ExpressionSpecification = ['==', ['get', 'color'], VIEW_WALK];
+  // A walk: a faint band of its colour along the pavements with small bright dots close
+  // together on it, ringed in its colour; a walk with a view, along the sea, on a wider band.
+  const view: ExpressionSpecification = ['get', 'view'];
   map.addLayer({
     id: 'mb-walk',
     type: 'line',
@@ -779,9 +796,9 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
     filter: ['get', 'dashed'],
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
-      'line-color': ['case', view, '#00D2DC', base === 'satellite' ? '#ffffff' : '#1E6FFF'],
-      'line-width': ['interpolate', ['linear'], ['zoom'], 12, ['case', view, 3, 1.5], 17, 4],
-      'line-opacity': ['case', view, 0.7, 0.45],
+      'line-color': ['get', 'color'],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 12, ['case', view, 3.5, 2.5], 17, 5],
+      'line-opacity': base === 'satellite' ? 0.75 : ['case', view, 0.7, 0.5],
     },
   });
   map.addLayer({
@@ -792,7 +809,7 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
     layout: {
       'symbol-placement': 'line',
       'symbol-spacing': ['interpolate', ['linear'], ['zoom'], 12, 5, 17, 8],
-      'icon-image': 'mb-walk-dot',
+      'icon-image': ['get', 'walkDot'],
       'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.35, 17, 0.58],
       'icon-allow-overlap': true,
       'icon-ignore-placement': true,
@@ -1383,6 +1400,14 @@ export default function MapView({ className }: { className?: string }) {
         navigate('stop', { ids: String(stop.properties.stops) });
         return;
       }
+      // A line the screen takes taps on: another trail met on a trail's way, added to it.
+      const keyed = features.find((f) => f.layer.id.startsWith('mb-line') && f.properties?.key);
+      const onLine = contentRef.current.onLine;
+      if (keyed && onLine) {
+        setPicked(undefined);
+        setNote(onLine(String(keyed.properties.key), false));
+        return;
+      }
       // Another trail met on a trail's way: its page.
       const branch = features.find((f) => f.layer.id.startsWith('mb-line') && f.properties?.href);
       if (branch) {
@@ -1455,6 +1480,22 @@ export default function MapView({ className }: { className?: string }) {
       if (flag) {
         setPicked(undefined);
         setNote({ title: String(flag.properties.name), lines: [] });
+        return;
+      }
+      // A finger held on a line the screen takes: a trail added to a walk taken off again.
+      const keyed = map
+        .queryRenderedFeatures(
+          [
+            [e.point.x - 8, e.point.y - 8],
+            [e.point.x + 8, e.point.y + 8],
+          ],
+          { layers: ['mb-line-hit'] },
+        )
+        .find((f) => f.properties?.key);
+      const onLine = contentRef.current.onLine;
+      if (keyed && onLine) {
+        setPicked(undefined);
+        setNote(onLine(String(keyed.properties.key), true));
         return;
       }
       const p = { lat: e.lngLat.lat, lon: e.lngLat.lng };
@@ -2122,6 +2163,7 @@ function apply(map: MapLibreMap, content: MapContent, fit: { current: Fit }) {
   addPlates(map, content);
   addStopDots(map, content);
   addFlags(map, content);
+  addWalkDots(map, content);
   const data = toGeoJson(content);
   (map.getSource('mb-lines') as GeoJSONSource | undefined)?.setData(data.lines);
   (map.getSource('mb-points') as GeoJSONSource | undefined)?.setData(data.points);

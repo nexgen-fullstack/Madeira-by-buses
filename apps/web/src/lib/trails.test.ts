@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { encodePolyline, haversine, type LatLon, type Trail } from '@madeirabus/engine';
-import { reversedTrail, startsAtEnd, trailBranches, trailLines, trailRegion } from './trails.ts';
+import {
+  branchKeys,
+  endOf,
+  reversedTrail,
+  startsAtEnd,
+  trailBranches,
+  trailLines,
+  trailRegion,
+  walkEnds,
+} from './trails.ts';
 
 const at = (lat: number, lon: number) => ({ start: [lat, lon] }) as unknown as Trail;
 
@@ -107,5 +116,65 @@ describe('which end a trail starts at', () => {
     expect(startsAtEnd(main, { lat: 32.69, lon: -16.87 })).toBe(true);
     // A loop starts where it is mapped to.
     expect(startsAtEnd({ ...main, roundtrip: true }, { lat: 32.69, lon: -16.87 })).toBe(false);
+  });
+});
+
+describe('a trail in pieces', () => {
+  // The Passeio Público Marítimo: Câmara de Lobos to Baía Azul, then on to the Lido in two
+  // more pieces, each starting a few tens of metres from where the one before ends.
+  const t = {
+    ...trail('ppm', [32.7, -16.9], [32.7, -16.89]),
+    lines: [
+      encodePolyline([
+        { lat: 32.7, lon: -16.9 },
+        { lat: 32.7, lon: -16.89 },
+      ]),
+      encodePolyline([
+        { lat: 32.7, lon: -16.8897 },
+        { lat: 32.7, lon: -16.885 },
+      ]),
+      encodePolyline([
+        { lat: 32.7003, lon: -16.885 },
+        { lat: 32.7, lon: -16.88 },
+      ]),
+    ],
+  } as Trail;
+  it('ends where its last piece ends', () => {
+    expect(endOf(t).lon).toBeCloseTo(-16.88, 5);
+  });
+  it('walked from its end, starts there, its pieces the other way and in the other order', () => {
+    const back = reversedTrail(t);
+    expect(back.start[1]).toBeCloseTo(-16.88, 5);
+    const lines = trailLines(back);
+    expect(lines[0]![0]!.lon).toBeCloseTo(-16.88, 5);
+    expect(lines.at(-1)!.at(-1)!.lon).toBeCloseTo(-16.9, 5);
+    expect(endOf(back).lon).toBeCloseTo(-16.9, 5);
+  });
+});
+
+describe('a walk with other trails added', () => {
+  const main = trail('main', [32.7, -16.9], [32.7, -16.88]);
+  // One leading into its start from the west, one going on past its end to the east.
+  const into = trail('into', [32.7, -16.92], [32.7, -16.9]);
+  const on = trail('on', [32.7, -16.88], [32.7, -16.86]);
+  const branches = trailBranches(main, [main, into, on]);
+  it('keys each way off once, by its trail', () => {
+    expect(branchKeys(branches)).toEqual(['into.0', 'on.0']);
+  });
+  it('starts where the trail leading in starts, and ends where the one going on ends', () => {
+    const ends = walkEnds(main, branches);
+    expect(ends.starts.map((s) => s.trail.id)).toEqual(['main', 'into', 'on']);
+    expect(ends.starts[ends.start]!.trail.id).toBe('into');
+    expect(ends.end.trail.id).toBe('on');
+    expect(ends.end.at.lon).toBeCloseTo(-16.86, 3);
+    // Alone, the trail's own start and end.
+    const alone = walkEnds(main, []);
+    expect([alone.start, alone.end.trail.id]).toEqual([0, 'main']);
+  });
+  it('starts at the start nearest to the phone', () => {
+    const ends = walkEnds(main, branches, { lat: 32.69, lon: -16.861 });
+    expect(ends.starts[ends.start]!.trail.id).toBe('on');
+    const west = walkEnds(main, branches, { lat: 32.69, lon: -16.899 });
+    expect(west.starts[west.start]!.trail.id).toBe('main');
   });
 });

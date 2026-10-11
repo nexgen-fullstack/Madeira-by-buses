@@ -1040,6 +1040,27 @@ input[type='time'],
 .hike-branch:hover {
   background: var(--surface-2);
 }
+/* A trail met: added to the walk (pressed), or not; its own page beside. */
+.hike-branch__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.hike-branch[aria-pressed='true'] {
+  background: var(--brand-soft);
+  box-shadow: inset 0 0 0 1.5px var(--brand);
+}
+.hike-branch[aria-pressed='true'] .hike-branch__swatch {
+  height: 10px;
+  border-radius: 5px;
+}
+.hike-branch__open {
+  flex: none;
+}
+.hike__starts {
+  align-items: center;
+  margin: 4px 0 8px;
+}
 .hike-branch__swatch {
   flex: none;
   width: 24px;

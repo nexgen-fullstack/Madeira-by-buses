@@ -75,13 +75,15 @@ export function trailLines(t: Trail): LatLon[][] {
  * down, its lines the other way.
  */
 export function reversedTrail(t: Trail): Trail {
+  const end = endOf(t);
   return {
     ...t,
-    start: t.end,
+    start: [end.lat, end.lon],
     end: t.start,
     up: t.down,
     down: t.up,
-    lines: trailLines(t).map((l) => encodePolyline([...l].reverse())),
+    // Its pieces in the other order too: walked from the last one's end.
+    lines: [...trailLines(t)].reverse().map((l) => encodePolyline([...l].reverse())),
   };
 }
 
@@ -144,7 +146,8 @@ export function trailBranches(trail: Trail, trails: readonly Trail[]): TrailBran
   const out: TrailBranch[] = [];
   for (const other of trails) {
     if (other.id === trail.id) continue;
-    for (const raw of trailLines(other)) {
+    const pieces = trailLines(other);
+    for (const [li, raw] of pieces.entries()) {
       // Not where the trail is: none of it.
       const la = raw.map((p) => p.lat);
       const lo = raw.map((p) => p.lon);
@@ -170,7 +173,12 @@ export function trailBranches(trail: Trail, trails: readonly Trail[]): TrailBran
         const b = k - 1;
         const leaves = a > 0;
         const comesBack = b < line.length - 1;
-        const coords = line.slice(leaves ? a - 1 : a, comesBack ? b + 2 : b + 1);
+        // To where the other trail ends: on through its pieces that go on from this one.
+        const coords = [
+          ...(leaves ? [] : chained(pieces, li, -1)),
+          ...line.slice(leaves ? a - 1 : a, comesBack ? b + 2 : b + 1),
+          ...(comesBack ? [] : chained(pieces, li, 1)),
+        ];
         if (lengthOf(coords) < BRANCH) continue;
         const branch = leaves
           ? { trail: other, coords, rejoins: comesBack, reversed: false }
@@ -178,6 +186,23 @@ export function trailBranches(trail: Trail, trails: readonly Trail[]): TrailBran
         out.push(alongTheWalk(trailLines(trail), branch));
       }
     }
+  }
+  return out;
+}
+
+/**
+ * The pieces of a trail that go on from its `li`th one, one after another, after it
+ * (`dir` 1) or before it (-1), as one line in the trail's order.
+ */
+function chained(pieces: readonly LatLon[][], li: number, dir: 1 | -1): LatLon[] {
+  let out: LatLon[] = [];
+  let at = dir === 1 ? pieces[li]!.at(-1) : pieces[li]![0];
+  for (let j = li + dir; at && j >= 0 && j < pieces.length; j += dir) {
+    const piece = pieces[j]!;
+    const near = dir === 1 ? piece[0] : piece.at(-1);
+    if (!near || haversine(near, at) > CHAIN) break;
+    out = dir === 1 ? [...out, ...piece] : [...piece, ...out];
+    at = dir === 1 ? piece.at(-1) : piece[0];
   }
   return out;
 }
@@ -251,7 +276,24 @@ export function alongTheWalk(lines: readonly LatLon[][], branch: TrailBranch): T
 }
 
 export const startOf = (t: Trail): LatLon => ({ lat: t.start[0], lon: t.start[1] });
-export const endOf = (t: Trail): LatLon => ({ lat: t.end[0], lon: t.end[1] });
+/** Pieces of a trail this close (m) end to start are one way on. */
+const CHAIN = 60;
+
+/**
+ * Where a trail ends: its mapped end, or, where pieces of it go on from there one after
+ * another (the Passeio Público Marítimo past Baía Azul to the Lido), the last one's end.
+ */
+export function endOf(t: Trail): LatLon {
+  let end: LatLon = { lat: t.end[0], lon: t.end[1] };
+  const lines = trailLines(t);
+  const i = lines.findIndex((l) => l.length > 0 && haversine(l.at(-1)!, end) < 1);
+  if (i < 0) return end;
+  for (const line of lines.slice(i + 1)) {
+    if (line.length === 0 || haversine(line[0]!, end) > CHAIN) break;
+    end = line.at(-1)!;
+  }
+  return end;
+}
 
 /**
  * Whether a trail is best walked from its end by someone at `here`: its end is the nearer
@@ -294,4 +336,57 @@ export function linesAt(net: Network, stop: number): string[] {
     numbers.add(net.routes[net.patterns[pattern]!.route]!.short);
   }
   return [...numbers].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+/** Trails meeting this close together (m, as near as a trail counts as met) meet at one place. */
+export const JUNCTION = 30;
+
+/** Where a walk starts or ends, and on which trail. */
+export interface WalkEnd {
+  at: LatLon;
+  trail: Trail;
+}
+
+/**
+ * Where a walk along `trail` with other trails `added` to it may start (the trail's start
+ * and each added one's), the one it best starts at — the nearest to `here`, or else the
+ * start of the one that leads into the trail's start — and where it ends: at the end of an
+ * added trail that goes on from the trail's end, or at the trail's own.
+ */
+export function walkEnds(
+  trail: Trail,
+  added: readonly TrailBranch[],
+  here?: LatLon,
+): { starts: WalkEnd[]; start: number; end: WalkEnd } {
+  const first = startOf(trail);
+  const last = endOf(trail);
+  const starts: WalkEnd[] = [
+    { at: first, trail },
+    ...added.map((b) => ({ at: b.coords[0]!, trail: b.trail })),
+  ];
+  let start = 0;
+  if (here) {
+    starts.forEach((s, i) => {
+      if (haversine(here, s.at) < haversine(here, starts[start]!.at)) start = i;
+    });
+  } else {
+    const into = added.findIndex((b) => haversine(b.coords.at(-1)!, first) < JUNCTION);
+    if (into >= 0) start = into + 1;
+  }
+  const on = added.find((b) => haversine(b.coords[0]!, last) < JUNCTION);
+  return {
+    starts,
+    start,
+    end: on ? { at: on.coords.at(-1)!, trail: on.trail } : { at: last, trail },
+  };
+}
+
+/** Each other trail met's key, as a walk keeps those added to it: its id and which of its ways off. */
+export function branchKeys(branches: readonly TrailBranch[]): string[] {
+  const seen = new Map<string, number>();
+  return branches.map((b) => {
+    const k = seen.get(b.trail.id) ?? 0;
+    seen.set(b.trail.id, k + 1);
+    return `${b.trail.id}.${k}`;
+  });
 }

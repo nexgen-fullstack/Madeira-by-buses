@@ -513,5 +513,10 @@ export const fr: Dict = {
   'hike.reverseLoop': 'Faire la boucle dans l’autre sens',
   'hike.branches': 'Sentiers qui bifurquent',
   'hike.branchesNote':
-    'Chacun de sa couleur sur la carte : drapeau vert là où il bifurque, drapeau à damier là où il finit. Touchez-en un pour le choisir.',
+    'Toucher un sentier sur la carte ou ici l’ajoute à la balade ; un appui long sur la carte le retire.',
+  'hike.tapToAdd': 'Touchez pour l’ajouter à la balade',
+  'hike.holdToRemove': 'Ajouté à la balade. Appui long pour le retirer',
+  'hike.startFrom': 'Partir de :',
+  'hike.withAdded': 'Avec les ajouts : {km} km · ≈ {time}',
+  'hike.open': 'Ouvrir le sentier « {name} »',
 };

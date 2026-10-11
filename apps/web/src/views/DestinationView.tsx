@@ -214,14 +214,11 @@ export function DestinationView({ d, route }: { d: Destination; route: Route }) 
   const end = (field: 'from' | 'to', value: PlaceValue | undefined): RouteEnd => ({
     value,
     onChange: (v) => setParams({ [field]: v ? encodePlace(v, net) : 'none', i: undefined }),
-    // "Where you are" on the start's field, as in a maps app; "to" chooses on the map.
-    onUseLocation:
-      field === 'from'
-        ? () => {
-            setParams({ [field]: 'here', i: undefined });
-            geo.request();
-          }
-        : undefined,
+    // "Where you are" on either field, as in a maps app: from here, or a way back to here.
+    onUseLocation: () => {
+      setParams({ [field]: 'here', i: undefined });
+      geo.request();
+    },
     locating: geo.pending && (field === 'from' ? fromToken : toToken) === 'here',
     onPickOnMap: (area) => setPick(field, area, value),
   });

@@ -78,7 +78,8 @@ export function PlanView({ route }: { route: Route }) {
   const [toast, setToast] = useState<string | undefined>();
   // Bumped to plan again when "now" moves past the first option.
   const [refresh, setRefresh] = useState(0);
-  const wantLocation = useRef(false);
+  // Which field waits for where the phone is.
+  const wantLocation = useRef<'from' | 'to' | false>(false);
   const resultsRef = useRef<HTMLDivElement>(null);
   const shownSearch = useRef('');
 
@@ -109,11 +110,12 @@ export function PlanView({ route }: { route: Route }) {
 
   // "My location" resolves asynchronously.
   useEffect(() => {
-    if (geo.position && wantLocation.current) {
+    const field = wantLocation.current;
+    if (geo.position && field) {
       wantLocation.current = false;
       // A start typed in meanwhile stays.
       if (autoLocate.current && fromParam) return;
-      setParams({ from: encodePlace(geo.position), i: undefined });
+      setParams({ [field]: encodePlace(geo.position), i: undefined });
     }
   }, [geo.position, setParams, fromParam]);
 
@@ -128,7 +130,7 @@ export function PlanView({ route }: { route: Route }) {
       .catch(() => undefined)
       .then((status) => {
         if (status?.state === 'denied' || locatedFor.current !== toParam) return;
-        wantLocation.current = true;
+        wantLocation.current = 'from';
         autoLocate.current = true;
         requestLocation();
       });
@@ -309,16 +311,23 @@ export function PlanView({ route }: { route: Route }) {
             value: from,
             onChange: (v) => setParams({ from: v ? encode(v) : undefined, i: undefined }),
             onUseLocation: () => {
-              wantLocation.current = true;
+              wantLocation.current = 'from';
               autoLocate.current = false;
               geo.request();
             },
-            locating: geo.pending,
+            locating: geo.pending && wantLocation.current === 'from',
             onPickOnMap: (area) => setPick('from', area),
           }}
           to={{
             value: to,
             onChange: (v) => setParams({ to: v ? encode(v) : undefined, i: undefined }),
+            // Where you are as the end too: a way to here from somewhere else.
+            onUseLocation: () => {
+              wantLocation.current = 'to';
+              autoLocate.current = false;
+              geo.request();
+            },
+            locating: geo.pending && wantLocation.current === 'to',
             onPickOnMap: (area) => setPick('to', area),
           }}
           onSwap={() =>

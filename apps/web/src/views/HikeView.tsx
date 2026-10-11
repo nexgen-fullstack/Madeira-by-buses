@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ArrowLeft,
   ArrowLeftRight,
@@ -6,7 +6,9 @@ import {
   Camera,
   ExternalLink,
   Flag,
+  Minus,
   Navigation,
+  Plus,
   Split,
   TriangleAlert,
 } from 'lucide-react';
@@ -26,7 +28,9 @@ import {
 import { photoUrl, trailPhoto, trailPhotoSpots, trailViews } from '../lib/photos.ts';
 import { goBack, navigate, replaceRoute } from '../lib/router.ts';
 import {
+  branchKeys,
   endOf,
+  JUNCTION,
   linesAt,
   nearestStop,
   reversedTrail,
@@ -36,6 +40,7 @@ import {
   trailById,
   trailLines,
   useTrails,
+  walkEnds,
   type TrailBranch,
 } from '../lib/trails.ts';
 import { useNetwork } from '../state/app.tsx';
@@ -61,8 +66,14 @@ function branchColors(branches: readonly TrailBranch[]): Map<string, string> {
   return colors;
 }
 
-/** Trails meeting this close together (m, as near as a trail counts as met) meet at one place. */
-const ONE_JUNCTION = 30;
+const ONE_JUNCTION = JUNCTION;
+
+/** A line's length (m). */
+const lengthOf = (line: readonly LatLon[]) =>
+  line.slice(1).reduce((m, p, i) => m + haversine(line[i]!, p), 0);
+
+/** Another trail met by its number and name. */
+const nameOf = (b: TrailBranch) => (b.trail.ref ? `${b.trail.ref} ${b.trail.name}` : b.trail.name);
 
 /** A trail's page, walked from its start or (`reversed`) from its end, as it is shown. */
 const hikeHref = (id: string, reversed: boolean) => `hikes/${id}?rev=${reversed ? 1 : 0}`;
@@ -131,7 +142,15 @@ function StopNear({ at, label }: { at: LatLon; label: string }) {
  * one where it ends (a tap chooses it), its facts, and the buses to it. Walked `reversed`,
  * its end is its start.
  */
-function Hike({ trail: asMapped, rev }: { trail: Trail; rev: string | null }) {
+function Hike({
+  trail: asMapped,
+  rev,
+  add,
+}: {
+  trail: Trail;
+  rev: string | null;
+  add: string | null;
+}) {
   const t = useI18n();
   const { net } = useNetwork();
   // Walked as asked, or else from the end nearer to where the phone is.
@@ -146,6 +165,39 @@ function Hike({ trail: asMapped, rev }: { trail: Trail; rev: string | null }) {
   const all = useTrails();
   const branches = useMemo(() => (all ? trailBranches(trail, all) : []), [trail, all]);
   const colors = useMemo(() => branchColors(branches), [branches]);
+  // The other trails added to the walk (a tap on one), kept in the address with the way.
+  const keys = useMemo(() => branchKeys(branches), [branches]);
+  const added = useMemo(() => new Set((add ?? '').split(',').filter(Boolean)), [add]);
+  const setAdded = (next: Set<string>) =>
+    replaceRoute(`hikes/${asMapped.id}`, {
+      rev: rev ?? undefined,
+      add: [...next].join(','),
+    });
+  const addedBranches = branches.filter((_, i) => added.has(keys[i]!));
+  // Where the walk starts: the start nearest to the phone, or the one chosen.
+  const ends = walkEnds(trail, addedBranches, here);
+  const [startChosen, setStartChosen] = useState<number | undefined>();
+  const walkStart =
+    ends.starts[
+      startChosen !== undefined && startChosen < ends.starts.length ? startChosen : ends.start
+    ]!;
+  const walkEnd = ends.end;
+  // A tap on another trail adds it to the walk; a finger held on one added takes it off.
+  const onLine = (key: string, held: boolean) => {
+    const b = branches[keys.indexOf(key)];
+    if (!b) return undefined;
+    const title = nameOf(b);
+    if (held) {
+      if (!added.has(key)) return { title, lines: [t.t('hike.tapToAdd')] };
+      const next = new Set(added);
+      next.delete(key);
+      setAdded(next);
+      return undefined;
+    }
+    if (added.has(key)) return { title, lines: [t.t('hike.holdToRemove')] };
+    setAdded(new Set([...added, key]));
+    return undefined;
+  };
 
   useMapContent(
     useMemo<MapContent>(() => {
@@ -167,12 +219,13 @@ function Hike({ trail: asMapped, rev }: { trail: Trail; rev: string | null }) {
       });
       return {
         lines: [
-          ...branches.map((b) => ({
+          // Added to the walk: as wide as the trail; the others thinner, a tap adds them.
+          ...branches.map((b, i) => ({
             coords: b.coords,
             color: colors.get(b.trail.id)!,
-            width: 4.5,
+            width: added.has(keys[i]!) ? 6 : 3.5,
             arrows: true,
-            href: hikeHref(b.trail.id, b.reversed),
+            key: keys[i]!,
           })),
           ...lines.map((coords) => ({ coords, color: TRAIL_RED, width: 6, arrows: true })),
         ],
@@ -182,7 +235,7 @@ function Hike({ trail: asMapped, rev }: { trail: Trail; rev: string | null }) {
             branches.map((b) => ({
               coords: b.coords,
               color: colors.get(b.trail.id)!,
-              name: b.trail.ref ? `${b.trail.ref} ${b.trail.name}` : b.trail.name,
+              name: nameOf(b),
             })),
           ),
           ...near,
@@ -192,15 +245,25 @@ function Hike({ trail: asMapped, rev }: { trail: Trail; rev: string | null }) {
         fitKey: `hike:${trail.id}`,
         fit: lines.flat(),
         focus: `hike:${trail.id}`,
+        onLine,
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [trail, net, branches, colors]),
+    }, [trail, net, branches, colors, keys, added]),
   );
   // Each other trail met, once, as listed under the trail: walked the way it turns off.
   const met = [...colors].map(([id, color]) => {
     const of = branches.filter((b) => b.trail.id === id);
-    return { trail: of[0]!.trail, reversed: of.every((b) => b.reversed), color };
+    const mine = keys.filter((_, i) => branches[i]!.trail.id === id);
+    return {
+      trail: of[0]!.trail,
+      reversed: of.every((b) => b.reversed),
+      color,
+      keys: mine,
+      on: mine.some((k) => added.has(k)),
+    };
   });
+  // The walk with the trails added to it: how long, how much time.
+  const addedLength = addedBranches.reduce((m, b) => m + lengthOf(b.coords), 0);
 
   const pic = trailPhoto(trail.id);
   const views = trailViews(trail.id);
@@ -286,8 +349,36 @@ function Hike({ trail: asMapped, rev }: { trail: Trail; rev: string | null }) {
         <h3 className="card__title">
           <Bus size={16} aria-hidden /> {t.t('hike.byBus')}
         </h3>
-        <StopNear at={start} label={t.t('hike.start')} />
-        {!trail.roundtrip && <StopNear at={end} label={t.t('hike.end')} />}
+        {/* With trails added, where the walk may start: the nearest one first chosen. */}
+        {ends.starts.length > 1 && (
+          <div className="chips hike__starts" role="group" aria-label={t.t('hike.startFrom')}>
+            <span className="muted small">{t.t('hike.startFrom')}</span>
+            {ends.starts.map((s, i) => (
+              <button
+                key={`${s.trail.id}-${i}`}
+                type="button"
+                className="chip"
+                aria-pressed={s === walkStart}
+                onClick={() => setStartChosen(i)}
+              >
+                {s.trail.name}
+              </button>
+            ))}
+          </div>
+        )}
+        {addedLength > 0 && (
+          <p className="small">
+            {t.t('hike.withAdded', {
+              km: trailKm(trail.length + addedLength, t.locale),
+              time: duration(
+                t,
+                trailMinutes(trail.length + addedLength, trail.up, trail.down) * 60,
+              ),
+            })}
+          </p>
+        )}
+        <StopNear at={walkStart.at} label={t.t('hike.start')} />
+        {!trail.roundtrip && <StopNear at={walkEnd.at} label={t.t('hike.end')} />}
         {/* No bus at its end: back the same way, as most walk PR 8 or the 25 Fontes. */}
         {backSameWay && (
           <p className="small hike__back">
@@ -300,7 +391,9 @@ function Hike({ trail: asMapped, rev }: { trail: Trail; rev: string | null }) {
           <button
             type="button"
             className="button button--primary"
-            onClick={() => navigate('plan', { to: encodePlace({ ...start, name: trail.name }) })}
+            onClick={() =>
+              navigate('plan', { to: encodePlace({ ...walkStart.at, name: walkStart.trail.name }) })
+            }
           >
             <Navigation size={16} aria-hidden /> {t.t('hike.routeTo')}
           </button>
@@ -308,7 +401,9 @@ function Hike({ trail: asMapped, rev }: { trail: Trail; rev: string | null }) {
             <button
               type="button"
               className="button"
-              onClick={() => navigate('plan', { from: encodePlace({ ...end, name: trail.name }) })}
+              onClick={() =>
+                navigate('plan', { from: encodePlace({ ...walkEnd.at, name: walkEnd.trail.name }) })
+              }
             >
               <Flag size={16} aria-hidden /> {t.t('hike.routeFrom')}
             </button>
@@ -318,7 +413,12 @@ function Hike({ trail: asMapped, rev }: { trail: Trail; rev: string | null }) {
             type="button"
             className="button"
             aria-pressed={reversed}
-            onClick={() => replaceRoute(`hikes/${trail.id}`, { rev: reversed ? '0' : '1' })}
+            onClick={() =>
+              replaceRoute(`hikes/${trail.id}`, {
+                rev: reversed ? '0' : '1',
+                add: add ?? undefined,
+              })
+            }
           >
             <ArrowLeftRight size={16} aria-hidden />{' '}
             {t.t(trail.roundtrip ? 'hike.reverseLoop' : 'hike.reverse')}
@@ -334,11 +434,20 @@ function Hike({ trail: asMapped, rev }: { trail: Trail; rev: string | null }) {
           <p className="muted small">{t.t('hike.branchesNote')}</p>
           <ul className="hike-branches">
             {met.map((m) => (
-              <li key={m.trail.id}>
+              <li key={m.trail.id} className="hike-branch__row">
+                {/* Added to the walk, or taken off it; its own page beside. */}
                 <button
                   type="button"
                   className="hike-branch"
-                  onClick={() => navigate(hikeHref(m.trail.id, m.reversed))}
+                  aria-pressed={m.on}
+                  onClick={() => {
+                    const next = new Set(added);
+                    for (const k of m.keys) {
+                      if (m.on) next.delete(k);
+                      else next.add(k);
+                    }
+                    setAdded(next);
+                  }}
                 >
                   <span
                     className="hike-branch__swatch"
@@ -351,6 +460,16 @@ function Hike({ trail: asMapped, rev }: { trail: Trail; rev: string | null }) {
                   <span className="muted small">
                     {t.t('scenic.km', { km: trailKm(m.trail.length, t.locale) })}
                   </span>
+                  {m.on ? <Minus size={16} aria-hidden /> : <Plus size={16} aria-hidden />}
+                </button>
+                <button
+                  type="button"
+                  className="icon-button hike-branch__open"
+                  aria-label={t.t('hike.open', { name: m.trail.name })}
+                  title={t.t('hike.open', { name: m.trail.name })}
+                  onClick={() => navigate(hikeHref(m.trail.id, m.reversed))}
+                >
+                  <ExternalLink size={16} />
                 </button>
               </li>
             ))}
@@ -435,11 +554,19 @@ function Hike({ trail: asMapped, rev }: { trail: Trail; rev: string | null }) {
  * A trail's page, once the trails are loaded; `rev` "1": walked from its end, "0": from its
  * start, none: from the end nearer to the phone.
  */
-export function HikeView({ id, rev = null }: { id: string; rev?: string | null }) {
+export function HikeView({
+  id,
+  rev = null,
+  add = null,
+}: {
+  id: string;
+  rev?: string | null;
+  add?: string | null;
+}) {
   const t = useI18n();
   const trails = useTrails();
   const trail = trailById(trails, id);
   if (!trails) return <p className="muted">{t.t('loading')}</p>;
   if (!trail) return <p className="error">{t.t('hikes.none')}</p>;
-  return <Hike key={trail.id} trail={trail} rev={rev} />;
+  return <Hike key={trail.id} trail={trail} rev={rev} add={add} />;
 }

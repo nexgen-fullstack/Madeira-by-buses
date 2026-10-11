@@ -23,8 +23,7 @@ import {
   pairFlags,
   RIDE_WIDTH,
   rideColor,
-  VIEW_WALK,
-  WALK_INK,
+  walkColor,
   type FlagLook,
   type MapContent,
   type MapPoint,
@@ -57,7 +56,14 @@ export function TripView() {
     // On foot: the walk from its start flag to its chequered one, and the walker on it.
     const walkLine = walk && {
       coords: walk.path,
-      color: hasView(walk.leg) ? VIEW_WALK : WALK_INK,
+      // In the colour this walk has on the route.
+      color: walkColor(
+        Math.max(
+          0,
+          (trip?.itinerary.legs ?? []).filter((l) => l.kind === 'walk').indexOf(walk.leg),
+        ),
+      ),
+      ...(hasView(walk.leg) ? { view: true } : {}),
       dashed: true,
     };
     const walkFlags = walk
@@ -121,7 +127,18 @@ export function TripView() {
       fit: [...setup.shape, ...(walk?.path ?? [])],
       focus: 'trip',
     };
-  }, [setup, ride, net, state, rideIndex, walk, position, phase, trip?.simulate]);
+  }, [
+    setup,
+    ride,
+    net,
+    state,
+    rideIndex,
+    walk,
+    position,
+    phase,
+    trip?.simulate,
+    trip?.itinerary.legs,
+  ]);
   useMapContent(content);
 
   if (trip && tracking && phase === 'walk') {
