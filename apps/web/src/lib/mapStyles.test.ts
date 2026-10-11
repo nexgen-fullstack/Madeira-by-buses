@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { StyleSpecification } from 'maplibre-gl';
 import {
   buildingLayers,
+  DEFAULT_LAYERS,
   fallbackStyle,
+  nextTrails,
   overlayVector,
   placeLayerIds,
   poiLabel,
@@ -169,5 +171,18 @@ describe('map styles', () => {
     expect(overlayVector(style, 'satellite').layers.find((l) => l.id === 'poi_r1')).toHaveProperty(
       'filter',
     );
+  });
+});
+
+describe('the trails button', () => {
+  it('puts the trails on with their photos, then alone, then takes them away', () => {
+    const one = nextTrails(DEFAULT_LAYERS);
+    expect([one.trails, one.trailPhotos]).toEqual([true, true]);
+    const two = nextTrails(one);
+    expect([two.trails, two.trailPhotos]).toEqual([true, false]);
+    const three = nextTrails(two);
+    expect([three.trails, three.trailPhotos]).toEqual([false, true]);
+    // The photos of the places with a view are the camera's: the trails leave them be.
+    for (const l of [one, two, three]) expect(l.scenic).toBe(DEFAULT_LAYERS.scenic);
   });
 });

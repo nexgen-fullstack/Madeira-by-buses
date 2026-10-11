@@ -7,11 +7,50 @@ import {
   type FareRide,
   type Itinerary,
   type Network,
+  type PlaceRef,
   type RideLeg,
+  type Travel,
   type WalkLeg,
 } from '@madeirabus/engine';
 
 export const ridesOf = (it: Itinerary) => it.legs.filter((l): l is RideLeg => l.kind === 'ride');
+
+/**
+ * A walk all the way as a journey to follow, as the planner's own: from `from` to `to`
+ * along `travel`'s way, leaving at `time` (s after midnight).
+ */
+export function walkItinerary(
+  travel: Travel,
+  from: PlaceRef,
+  to: PlaceRef,
+  time: number,
+): Itinerary {
+  const distance = Math.round(travel.length);
+  return {
+    key: `walk:${from.lat.toFixed(5)},${from.lon.toFixed(5)}>${to.lat.toFixed(5)},${to.lon.toFixed(5)}`,
+    legs: [
+      {
+        kind: 'walk',
+        from,
+        to,
+        start: time,
+        end: time + travel.seconds,
+        distance,
+        path: travel.path,
+        ...(travel.up !== undefined ? { up: travel.up, down: travel.down ?? 0 } : {}),
+      },
+    ],
+    depart: time,
+    arrive: time + travel.seconds,
+    duration: travel.seconds,
+    rides: 0,
+    transfers: 0,
+    walkDistance: distance,
+    waitTime: 0,
+    fare: { rides: [], giro: 0, cash: 0, knownGiro: 0, complete: true },
+    risky: false,
+  };
+}
 
 /** Metres in round tens, as a climb is told ("~120 m up"). */
 const tens = (m: number) => Math.round(m / 10) * 10;

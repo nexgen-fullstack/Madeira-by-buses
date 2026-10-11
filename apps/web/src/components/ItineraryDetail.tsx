@@ -323,10 +323,11 @@ export function ItineraryDetail({ it, date, ahead, onFocusLeg, onBack, onStart, 
         )}
       </ol>
 
-      {it.rides > 0 && (
+      {/* A bus ride followed to its stop, or a walk all the way turn by turn. */}
+      {it.legs.length > 0 && (
         <div className="detail__actions">
           <button type="button" className="button button--primary" onClick={() => onStart(false)}>
-            <Navigation size={18} /> {t.t('detail.start')}
+            <Navigation size={18} /> {t.t(it.rides > 0 ? 'detail.start' : 'guide.start')}
           </button>
           {/* Developers and the browser tests only: not translated, never in the phone app. */}
           {canSimulate() && (

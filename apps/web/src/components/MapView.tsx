@@ -19,6 +19,7 @@ import { haversine, type LatLon, type Network } from '@madeirabus/engine';
 import { useI18n } from '../i18n.ts';
 import { luminance, readableOn } from '../lib/color.ts';
 import { decodePlace, encodePlace } from '../lib/itinerary.ts';
+import { rememberPosition } from '../lib/geolocation.ts';
 import { hideLaunch } from '../lib/launch.ts';
 import {
   RUN_WIDTH,
@@ -28,6 +29,8 @@ import {
   VR_VIOLET,
   WAY_TURQUOISE,
   WAY_WIDTH,
+  type FlagLook,
+  type FlagMode,
   type LineNote,
   type MapContent,
   type ScenicSpot,
@@ -38,6 +41,7 @@ import {
   extrusionLayer,
   fallbackStyle,
   loadStyle,
+  nextTrails,
   placeLayerIds,
   poiLabel,
   type BaseLayer,
@@ -209,6 +213,8 @@ function toGeoJson(content: MapContent) {
           apart: Boolean(p.apart),
           heading: p.heading ?? -1,
           dot: stopDotId(p.fill ?? '#ffffff'),
+          flag: flagId(p.kind === 'alight', p.flag),
+          name: p.name ?? p.label ?? '',
         },
         geometry: { type: 'Point' as const, coordinates: [p.lon, p.lat] },
       })),
@@ -342,18 +348,125 @@ function canvasImage(
   return ctx.getImageData(0, 0, width, height);
 }
 
-const FLAG_W = 64;
-const FLAG_H = 72;
+const FLAG_W = 72;
+const FLAG_H = 80;
+const FLAG_INK = '#14181F';
+const FLAG_GREEN = '#00C853';
+
+/** The image of a flag: plain, or as `look` says (each look drawn once). */
+const flagId = (finish: boolean, look?: FlagLook) =>
+  look
+    ? `mb-flag-${finish ? 'finish' : 'start'}-${look.mode}-${look.color.replace('#', '').toLowerCase()}-${look.text ?? ''}`
+    : finish
+      ? 'mb-flag-finish'
+      : 'mb-flag-start';
 
 /**
- * A flag as in Formula 1, its pole at the bottom corner standing on the stop: the green
- * one where a bus is boarded (cloth to the right), the chequered one where it is left
- * (cloth to the left), so that at a change of bus the two stand side by side.
+ * What goes the way, drawn in `color` round (`cx`, `cy`) in a box of `size` px: a walker,
+ * a hiker with a stick, a car or a bike, in thick round strokes that read when small.
  */
-function flagImage(finish: boolean): ImageData | undefined {
+function drawMode(
+  ctx: CanvasRenderingContext2D,
+  mode: Exclude<FlagMode, 'bus'>,
+  color: string,
+  cx: number,
+  cy: number,
+  size: number,
+) {
+  // Drawn on a grid of 24 round the middle.
+  const k = size / 24;
+  const x = (u: number) => cx + u * k;
+  const y = (v: number) => cy + v * k;
+  const path = (...pts: [number, number][]) => {
+    ctx.beginPath();
+    pts.forEach(([u, v], i) => (i === 0 ? ctx.moveTo(x(u), y(v)) : ctx.lineTo(x(u), y(v))));
+    ctx.stroke();
+  };
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2.8 * k;
+  if (mode === 'walk' || mode === 'trail') {
+    ctx.beginPath();
+    ctx.arc(x(1.5), y(-8), 2.8 * k, 0, Math.PI * 2);
+    ctx.fill();
+    // The body leaning forward, an arm and a leg each way.
+    path([1, -4], [-0.5, 3]);
+    path([-0.5, 3], [-4.5, 10]);
+    path([-0.5, 3], [3, 6], [3.5, 10.5]);
+    path([0.5, -3], [-3.5, 1]);
+    path([0.5, -3], [4, 0]);
+    // A hiker's stick.
+    if (mode === 'trail') path([6.5, -1], [7.5, 10.5]);
+  } else if (mode === 'car') {
+    ctx.beginPath();
+    ctx.moveTo(x(-10), y(5));
+    ctx.lineTo(x(-10), y(0));
+    ctx.lineTo(x(-6.5), y(-1));
+    ctx.lineTo(x(-4), y(-6.5));
+    ctx.lineTo(x(4), y(-6.5));
+    ctx.lineTo(x(6.5), y(-1));
+    ctx.lineTo(x(10), y(0));
+    ctx.lineTo(x(10), y(5));
+    ctx.closePath();
+    ctx.fill();
+    // Its windows white, its wheels dark.
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(x(-4.5), y(-1.2));
+    ctx.lineTo(x(-3), y(-4.8));
+    ctx.lineTo(x(3), y(-4.8));
+    ctx.lineTo(x(4.5), y(-1.2));
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = FLAG_INK;
+    for (const u of [-5.5, 5.5]) {
+      ctx.beginPath();
+      ctx.arc(x(u), y(5.5), 2.8 * k, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    ctx.lineWidth = 2.2 * k;
+    for (const u of [-6.5, 6.5]) {
+      ctx.beginPath();
+      ctx.arc(x(u), y(4), 4.6 * k, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    path([-6.5, 4], [-2, -3], [4, -3], [6.5, 4]);
+    path([-2, -3], [0.5, 4], [4, -3]);
+    path([-6.5, 4], [0.5, 4]);
+    path([-3.5, -6], [-0.5, -6]);
+    path([4, -3], [3, -7], [5.5, -7]);
+  }
+  ctx.restore();
+}
+
+/** Text as big as fits `width` (px), up to `max`, in bold. */
+function fitFont(ctx: CanvasRenderingContext2D, text: string, width: number, max: number) {
+  let px = max;
+  for (; px > 10; px--) {
+    ctx.font = `800 ${px}px system-ui, 'Segoe UI', Roboto, sans-serif`;
+    if (ctx.measureText(text).width <= width) break;
+  }
+}
+
+/**
+ * A flag as in Formula 1, its pole at the bottom corner standing on the stop: the start
+ * flag (cloth to the right), the chequered one where the way ends (cloth to the left), so
+ * that where one way ends and the next starts the two stand side by side. A bus's start
+ * flag is of its line's colour with its number, its chequered one of that colour and black
+ * with its number large in the middle; the others' start flag green, the chequered one
+ * black and white, with a walker, a hiker, a car or a bike in the way's colour on a white
+ * disc. Without a `look`, plain.
+ */
+function flagImage(finish: boolean, look?: FlagLook): ImageData | undefined {
   return canvasImage(FLAG_W, FLAG_H, (ctx) => {
     const pole = finish ? FLAG_W - 6 : 6;
-    const cloth = { x: finish ? 8 : 9, y: 5, w: FLAG_W - 17, h: 32 };
+    const cloth = { x: finish ? 8 : 9, y: 5, w: FLAG_W - 17, h: 38 };
+    const mid = { x: cloth.x + cloth.w / 2, y: cloth.y + cloth.h / 2 };
+    const bus = look?.mode === 'bus';
     // The pole, white-edged to read on the aerial photos.
     ctx.lineCap = 'round';
     ctx.strokeStyle = '#ffffff';
@@ -372,19 +485,64 @@ function flagImage(finish: boolean): ImageData | undefined {
       const rows = 4;
       const cw = cloth.w / cols;
       const ch = cloth.h / rows;
+      // A bus's in its colour and black; the others' black and white.
+      const light = bus ? look.color : '#ffffff';
       for (let r = 0; r < rows; r++)
         for (let c = 0; c < cols; c++) {
-          ctx.fillStyle = (r + c) % 2 ? '#ffffff' : '#14181F';
+          ctx.fillStyle = (r + c) % 2 ? light : FLAG_INK;
           ctx.fillRect(cloth.x + c * cw, cloth.y + r * ch, cw, ch);
         }
     } else {
-      ctx.fillStyle = '#00C853';
+      ctx.fillStyle = bus ? look.color : FLAG_GREEN;
       ctx.fillRect(cloth.x, cloth.y, cloth.w, cloth.h);
     }
-    ctx.strokeStyle = '#14181F';
+    ctx.strokeStyle = FLAG_INK;
     ctx.lineWidth = 2.5;
     ctx.strokeRect(cloth.x, cloth.y, cloth.w, cloth.h);
+    if (!look) return;
+    if (look.mode === 'bus') {
+      const text = look.text ?? '';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      if (finish) {
+        // Large in the middle, black on a white edge: it reads on the chequers.
+        fitFont(ctx, text, cloth.w - 4, 28);
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = '#ffffff';
+        ctx.strokeText(text, mid.x, mid.y + 1);
+        ctx.fillStyle = FLAG_INK;
+        ctx.fillText(text, mid.x, mid.y + 1);
+      } else {
+        fitFont(ctx, text, cloth.w - 8, 24);
+        ctx.fillStyle = readableOn(look.color);
+        ctx.fillText(text, mid.x, mid.y + 1);
+      }
+      return;
+    }
+    // A white disc in a dark ring in the middle, with what goes the way.
+    const r = cloth.h / 2 - 3;
+    ctx.beginPath();
+    ctx.arc(mid.x, mid.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = FLAG_INK;
+    ctx.stroke();
+    drawMode(ctx, look.mode, look.color, mid.x, mid.y, r * 1.55);
   });
+}
+
+/** Puts on the map the flags its ways start and end at, each look once. */
+function addFlags(map: MapLibreMap, content: MapContent) {
+  for (const p of content.points) {
+    if (p.kind !== 'board' && p.kind !== 'alight') continue;
+    const finish = p.kind === 'alight';
+    const id = flagId(finish, p.flag);
+    if (map.hasImage(id)) continue;
+    const image = flagImage(finish, p.flag);
+    if (image) map.addImage(id, image, { pixelRatio: 2 });
+  }
 }
 
 /** The plate a line's number is written on, one for each colour of line. */
@@ -506,7 +664,18 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
   // where each starts, a dot in its red with its number from closer in.
   map.addSource('mb-trails', { type: 'geojson', data: EMPTY });
   map.addSource('mb-trail-heads', { type: 'geojson', data: EMPTY });
-  const trailWidth = ['interpolate', ['linear'], ['zoom'], 9, 1.4, 12, 2.4, 15, 3.6];
+  const trailWidth = (k: number) =>
+    [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      9,
+      1.4 * k,
+      12,
+      2.4 * k,
+      15,
+      3.6 * k,
+    ] as unknown as number;
   map.addLayer({
     id: 'mb-trail-casing',
     type: 'line',
@@ -514,7 +683,8 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
     layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' },
     paint: {
       'line-color': '#ffffff',
-      'line-width': ['*', trailWidth, 2.2] as unknown as number,
+      // Zoom only at the top of an expression: the edge's own stops.
+      'line-width': trailWidth(2.2),
       'line-opacity': 0.75,
     },
   });
@@ -525,7 +695,7 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
     layout: { 'line-join': 'round', visibility: 'none' },
     paint: {
       'line-color': TRAIL_RED,
-      'line-width': trailWidth as unknown as number,
+      'line-width': trailWidth(1),
       'line-dasharray': [2, 1.2],
     },
   });
@@ -810,7 +980,7 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
     source: 'mb-points',
     filter: ['match', ['get', 'kind'], ['board', 'alight'], true, false],
     layout: {
-      'icon-image': ['match', ['get', 'kind'], 'board', 'mb-flag-start', 'mb-flag-finish'],
+      'icon-image': ['get', 'flag'],
       'icon-anchor': ['match', ['get', 'kind'], 'board', 'bottom-left', 'bottom-right'],
       // The pole's foot on the stop, the cloth up and to the side; where a bus is left and
       // the next boarded at one place, the two poles a few pixels apart.
@@ -1105,9 +1275,9 @@ export default function MapView({ className }: { className?: string }) {
     }, [linePick, lineChoice]),
   );
   const transitRef = useRef<{ data?: TransitData; on: boolean }>({ on: false });
-  // The hiking trails: on by the button or layers, and always on the trails tab.
+  // The hiking trails: on by the button or layers (and while the trails tab is open).
   const trailsRef = useRef<{ data?: TrailData; on: boolean }>({ on: false });
-  const trailsOn = layers.trails || Boolean(content.trails);
+  const trailsOn = layers.trails;
   const [trailData, setTrailData] = useState<TrailData | undefined>();
   useEffect(() => {
     if (!trailsOn || trailData) return;
@@ -1153,13 +1323,20 @@ export default function MapView({ className }: { className?: string }) {
     // While developing, the map for the browser console (to put the camera where a screenshot was).
     if (import.meta.env.DEV) (window as unknown as { mbMap?: MapLibreMap }).mbMap = map;
     map.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
-    map.addControl(
-      new GeolocateControl({
-        positionOptions: { enableHighAccuracy: true },
-        trackUserLocation: true,
+    const locate = new GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: true,
+    });
+    // Where the phone was found: a trail then starts at its nearer end.
+    locate.on('geolocate', (p) =>
+      rememberPosition({
+        lat: p.coords.latitude,
+        lon: p.coords.longitude,
+        accuracy: p.coords.accuracy,
+        timestamp: p.timestamp,
       }),
-      'top-right',
     );
+    map.addControl(locate, 'top-right');
     map.addControl(new ScaleControl({ maxWidth: 90 }), 'bottom-right');
     const foldCredits = foldAttribution(map);
     map.on('dragstart', foldCredits);
@@ -1265,6 +1442,21 @@ export default function MapView({ className }: { className?: string }) {
     // Long press / right click drops a pin anywhere.
     map.on('contextmenu', (e: MapMouseEvent) => {
       if (pickRef.current) return;
+      // A finger held on a flag: the name of its place, which the map does not write.
+      const flag = map
+        .queryRenderedFeatures(
+          [
+            [e.point.x - 10, e.point.y - 10],
+            [e.point.x + 10, e.point.y + 10],
+          ],
+          { layers: ['mb-flag'] },
+        )
+        .find((f) => f.properties?.name);
+      if (flag) {
+        setPicked(undefined);
+        setNote({ title: String(flag.properties.name), lines: [] });
+        return;
+      }
       const p = { lat: e.lngLat.lat, lon: e.lngLat.lng };
       setNote(undefined);
       setPicked({ name: pointName(netRef.current, p, tRef.current), ...p });
@@ -1372,25 +1564,30 @@ export default function MapView({ className }: { className?: string }) {
   useSpotlightMarker(mapRef, ready, spotlight);
   // And on a place tapped or a pin dropped.
   useMarker(mapRef, ready, pick ? undefined : picked);
-  // The places with a view by their photos, where they are (not while a place is picked).
-  // The photos of the places with a view, and with the trails those along them, where each
-  // was taken; the camera button hides them all.
+  // The photos of the places with a view where they are (not while a place is picked): the
+  // camera button hides them. With the trails, the photos along them where each was taken:
+  // the trails button's second step hides those, and only those.
   // With the trails on, the photos without their names (a finger held on one shows it),
   // but for the trail chosen's own.
-  const allTrails = useTrails(trailsOn && layers.scenic);
+  const trailPhotosOn = layers.trailPhotos;
+  const allTrails = useTrails(trailsOn && trailPhotosOn);
   const hikeChosen = content.focus?.startsWith('hike:') ?? false;
   const photoSpots = useMemo(() => {
-    if (!layers.scenic) return undefined;
     const quiet = (s: ScenicSpot): ScenicSpot => ({ ...s, quiet: true });
     const spots = [
-      ...(content.scenic ?? []).map((s) => (trailsOn && !hikeChosen ? quiet(s) : s)),
-      ...(trailsOn && allTrails ? allTrails.flatMap(trailPhotoSpots).map(quiet) : []),
+      ...(content.scenic ?? [])
+        .filter((s) => (s.trail ? trailPhotosOn : layers.scenic))
+        .map((s) => (trailsOn && !hikeChosen ? quiet(s) : s)),
+      ...(trailsOn && trailPhotosOn && allTrails
+        ? allTrails.flatMap(trailPhotoSpots).map(quiet)
+        : []),
     ];
+    if (spots.length === 0) return undefined;
     // Each once, as it came first.
     const byId = new Map<string, ScenicSpot>();
     for (const s of spots) if (!byId.has(s.id)) byId.set(s.id, s);
     return [...byId.values()];
-  }, [layers.scenic, content.scenic, trailsOn, hikeChosen, allTrails]);
+  }, [layers.scenic, content.scenic, trailsOn, trailPhotosOn, hikeChosen, allTrails]);
   useScenicMarkers(mapRef, ready, pick ? undefined : photoSpots);
   // A run or a line tapped belongs to the map shown; another one, forget it.
   useEffect(() => {
@@ -1536,15 +1733,26 @@ export default function MapView({ className }: { className?: string }) {
         >
           <Bus size={18} />
         </button>
+        {/* The trails with their photos, the trails alone, none: a tap each. */}
         <button
           type="button"
-          className="map-tool map-tool--trails"
+          className={`map-tool map-tool--trails${trailsOn && !trailPhotosOn ? ' map-tool--lines' : ''}`}
           aria-pressed={trailsOn}
           aria-label={t.t('layers.trails')}
-          title={t.t('layers.trails')}
-          onClick={() => setSettings({ map: { ...layers, trails: !layers.trails } })}
+          title={t.t(
+            !trailsOn
+              ? 'layers.trailsOff'
+              : trailPhotosOn
+                ? 'layers.trailsPhotos'
+                : 'layers.trailsLines',
+          )}
+          data-step={!trailsOn ? 'off' : trailPhotosOn ? 'photos' : 'lines'}
+          onClick={() => setSettings({ map: nextTrails(layers) })}
         >
           <Signpost size={18} />
+          {trailsOn && trailPhotosOn && (
+            <Camera size={10} className="map-tool__badge" aria-hidden />
+          )}
         </button>
         <button
           type="button"
@@ -1894,7 +2102,9 @@ function fitTo(map: MapLibreMap, bounds: LngLatBounds, duration: number) {
   // A phone on its side has little height: smaller margins, for a larger island. At the
   // top, clear of the buttons there and of the pin and flags standing up from the stops.
   const low = room < 420;
-  const top = low ? 56 : 92;
+  // Below the turn-by-turn banner over the map's top, while walking.
+  const guide = parseFloat(getComputedStyle(map.getContainer()).getPropertyValue('--guide-h'));
+  const top = (low ? 56 : 92) + (Number.isFinite(guide) ? guide : 0);
   const bottom = (low ? 16 : 40) + (Number.isFinite(sheet) ? sheet : 0);
   map.fitBounds(bounds, {
     padding: {
@@ -1911,6 +2121,7 @@ function fitTo(map: MapLibreMap, bounds: LngLatBounds, duration: number) {
 function apply(map: MapLibreMap, content: MapContent, fit: { current: Fit }) {
   addPlates(map, content);
   addStopDots(map, content);
+  addFlags(map, content);
   const data = toGeoJson(content);
   (map.getSource('mb-lines') as GeoJSONSource | undefined)?.setData(data.lines);
   (map.getSource('mb-points') as GeoJSONSource | undefined)?.setData(data.points);

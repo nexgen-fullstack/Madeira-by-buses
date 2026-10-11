@@ -15,7 +15,14 @@ import { useMapContent, useSpotlight } from '../components/mapContext.tsx';
 import { useI18n, type Key } from '../i18n.ts';
 import { duration } from '../lib/format.ts';
 import { encodePlace } from '../lib/itinerary.ts';
-import { FLAG_FOOT, TRAIL_RED, type MapContent, type MapPoint } from '../lib/mapContent.ts';
+import { useQuietPosition } from '../lib/geolocation.ts';
+import {
+  flagPoint,
+  pairFlags,
+  TRAIL_RED,
+  type MapContent,
+  type MapPoint,
+} from '../lib/mapContent.ts';
 import { photoUrl, trailPhoto, trailPhotoSpots, trailViews } from '../lib/photos.ts';
 import { goBack, navigate, replaceRoute } from '../lib/router.ts';
 import {
@@ -24,6 +31,7 @@ import {
   nearestStop,
   reversedTrail,
   startOf,
+  startsAtEnd,
   trailBranches,
   trailById,
   trailLines,
@@ -53,21 +61,41 @@ function branchColors(branches: readonly TrailBranch[]): Map<string, string> {
   return colors;
 }
 
-/** Where other trails turn off this close together (m), they turn off at one place. */
-const ONE_JUNCTION = 20;
+/** Trails meeting this close together (m, as near as a trail counts as met) meet at one place. */
+const ONE_JUNCTION = 30;
 
-/** A trail's page, walked from its start or (`reversed`) from its end. */
-const hikeHref = (id: string, reversed: boolean) => `hikes/${id}${reversed ? '?rev=1' : ''}`;
+/** A trail's page, walked from its start or (`reversed`) from its end, as it is shown. */
+const hikeHref = (id: string, reversed: boolean) => `hikes/${id}?rev=${reversed ? 1 : 0}`;
 
-/** A start flag, or a chequered one (`finish`), with a name. */
-const flag = (p: LatLon, finish: boolean, label?: string): MapPoint => ({
-  lat: p.lat,
-  lon: p.lon,
-  kind: finish ? 'alight' : 'board',
-  color: '#ffffff',
-  fill: FLAG_FOOT,
-  ...(label ? { label } : {}),
-});
+/**
+ * A trail's flags and those of the trails met on its way, each with a hiker in its colour:
+ * one start flag where several start together and one chequered flag where several end
+ * (the trail's own first), and where one ends and another starts, the two side by side. No
+ * names on the map: a finger held on a flag tells it.
+ */
+function trailFlags(
+  trail: { start: LatLon; end: LatLon; name: string },
+  branches: readonly { coords: LatLon[]; color: string; name: string }[],
+): MapPoint[] {
+  const own = { mode: 'trail', color: TRAIL_RED } as const;
+  const starts = [
+    flagPoint(trail.start, false, own, trail.name),
+    ...branches.map((b) =>
+      flagPoint(b.coords[0]!, false, { mode: 'trail', color: b.color }, b.name),
+    ),
+  ];
+  const ends = [
+    flagPoint(trail.end, true, own, trail.name),
+    ...branches.map((b) =>
+      flagPoint(b.coords.at(-1)!, true, { mode: 'trail', color: b.color }, b.name),
+    ),
+  ];
+  const once = (all: MapPoint[]) =>
+    all.filter((p, i) => all.findIndex((q) => haversine(p, q) < ONE_JUNCTION) === i);
+  const points = [...once(starts), ...once(ends)];
+  pairFlags(points, ONE_JUNCTION);
+  return points;
+}
 
 /** A bus stop near an end of a trail: its name, how far, its lines. */
 function StopNear({ at, label }: { at: LatLon; label: string }) {
@@ -103,9 +131,12 @@ function StopNear({ at, label }: { at: LatLon; label: string }) {
  * one where it ends (a tap chooses it), its facts, and the buses to it. Walked `reversed`,
  * its end is its start.
  */
-function Hike({ trail: asMapped, reversed }: { trail: Trail; reversed: boolean }) {
+function Hike({ trail: asMapped, rev }: { trail: Trail; rev: string | null }) {
   const t = useI18n();
   const { net } = useNetwork();
+  // Walked as asked, or else from the end nearer to where the phone is.
+  const here = useQuietPosition();
+  const reversed = rev === null ? startsAtEnd(asMapped, here) : rev === '1';
   const trail = useMemo(
     () => (reversed ? reversedTrail(asMapped) : asMapped),
     [asMapped, reversed],
@@ -134,8 +165,6 @@ function Hike({ trail: asMapped, reversed }: { trail: Trail; reversed: boolean }
           },
         ] as MapPoint[];
       });
-      // A loop ends where it started: the two flags side by side.
-      const loop = trail.roundtrip ? { pair: true } : {};
       return {
         lines: [
           ...branches.map((b) => ({
@@ -148,14 +177,14 @@ function Hike({ trail: asMapped, reversed }: { trail: Trail; reversed: boolean }
           ...lines.map((coords) => ({ coords, color: TRAIL_RED, width: 6, arrows: true })),
         ],
         points: [
-          // One start flag where a trail crosses, though it turns off both ways there.
-          ...branches
-            .map((b) => b.coords[0]!)
-            .filter((p, i, all) => all.findIndex((q) => haversine(p, q) < ONE_JUNCTION) === i)
-            .map((p) => flag(p, false)),
-          ...branches.map((b) => flag(b.coords.at(-1)!, true, b.trail.ref ?? b.trail.name)),
-          { ...flag(start, false, trail.name), ...loop },
-          { ...flag(end, true), ...loop },
+          ...trailFlags(
+            { start, end, name: trail.name },
+            branches.map((b) => ({
+              coords: b.coords,
+              color: colors.get(b.trail.id)!,
+              name: b.trail.ref ? `${b.trail.ref} ${b.trail.name}` : b.trail.name,
+            })),
+          ),
           ...near,
         ],
         // Its photos where they were taken: its own, its viewpoints'.
@@ -289,7 +318,7 @@ function Hike({ trail: asMapped, reversed }: { trail: Trail; reversed: boolean }
             type="button"
             className="button"
             aria-pressed={reversed}
-            onClick={() => replaceRoute(`hikes/${trail.id}`, reversed ? {} : { rev: '1' })}
+            onClick={() => replaceRoute(`hikes/${trail.id}`, { rev: reversed ? '0' : '1' })}
           >
             <ArrowLeftRight size={16} aria-hidden />{' '}
             {t.t(trail.roundtrip ? 'hike.reverseLoop' : 'hike.reverse')}
@@ -402,12 +431,15 @@ function Hike({ trail: asMapped, reversed }: { trail: Trail; reversed: boolean }
   );
 }
 
-/** A trail's page, once the trails are loaded; `reversed`: walked from its end. */
-export function HikeView({ id, reversed = false }: { id: string; reversed?: boolean }) {
+/**
+ * A trail's page, once the trails are loaded; `rev` "1": walked from its end, "0": from its
+ * start, none: from the end nearer to the phone.
+ */
+export function HikeView({ id, rev = null }: { id: string; rev?: string | null }) {
   const t = useI18n();
   const trails = useTrails();
   const trail = trailById(trails, id);
   if (!trails) return <p className="muted">{t.t('loading')}</p>;
   if (!trail) return <p className="error">{t.t('hikes.none')}</p>;
-  return <Hike key={trail.id} trail={trail} reversed={reversed} />;
+  return <Hike key={trail.id} trail={trail} rev={rev} />;
 }

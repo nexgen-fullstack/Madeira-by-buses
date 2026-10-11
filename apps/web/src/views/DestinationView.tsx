@@ -21,7 +21,7 @@ import { useI18n, type Key } from '../i18n.ts';
 import { findOptions, firstDeparture, type Found } from '../lib/ahead.ts';
 import { aheadFrom, capitalise, dayAhead, longDate } from '../lib/format.ts';
 import { useGeolocation } from '../lib/geolocation.ts';
-import { decodePlace, encodePlace } from '../lib/itinerary.ts';
+import { decodePlace, encodePlace, walkItinerary } from '../lib/itinerary.ts';
 import { itineraryContent, travelContent, type MapContent } from '../lib/mapContent.ts';
 import { goBack, navigate, type Route } from '../lib/router.ts';
 import {
@@ -166,7 +166,7 @@ export function DestinationView({ d, route }: { d: Destination; route: Route }) 
   const selectedDay = (selected !== undefined && found?.days[selected]) || date;
   useMapContent(
     useMemo<MapContent>(() => {
-      if (travelShown) return travelContent(travelShown);
+      if (travelShown) return travelContent(travelShown, { from: origin?.name, to: d.name });
       const it = selectedIt ?? results?.find((r) => r.rides > 0);
       if (it) return itineraryContent(net, it, undefined, it === selectedIt);
       return {
@@ -179,7 +179,7 @@ export function DestinationView({ d, route }: { d: Destination; route: Route }) 
           { lat: d.lat - 0.01, lon: d.lon - 0.01 },
         ],
       };
-    }, [net, d, results, selectedIt, travelShown]),
+    }, [net, d, results, selectedIt, travelShown, origin?.name]),
   );
 
   if (selectedIt) {
@@ -319,7 +319,28 @@ export function DestinationView({ d, route }: { d: Destination; route: Route }) 
                 loading={travelling}
               />
             )}
-            {mode !== 'bus' && <TravelCard mode={mode} travel={travelShown} loading={travelling} />}
+            {mode !== 'bus' && (
+              <TravelCard
+                mode={mode}
+                travel={travelShown}
+                loading={travelling}
+                onStart={(simulate) => {
+                  if (!travelShown || !origin) return;
+                  setTrip({
+                    itinerary: walkItinerary(
+                      travelShown,
+                      { name: origin.name, lat: origin.lat, lon: origin.lon },
+                      { name: d.name, lat: d.lat, lon: d.lon },
+                      now.time,
+                    ),
+                    date: now.date,
+                    simulate,
+                    generatedAt: net.bundle.generatedAt,
+                  });
+                  navigate('trip');
+                }}
+              />
+            )}
             {mode === 'bus' && (loading || (wantsHere && geo.pending)) && (
               <p className="plan__status" role="status">
                 <Loader2 size={16} className="spin" aria-hidden /> {t.t('searching')}

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Bike, Bus, Car, Footprints, Navigation } from 'lucide-react';
+import { Bike, Bus, Car, Footprints, Navigation, PlayCircle } from 'lucide-react';
 import type { LatLon, Travel, TravelMode } from '@madeirabus/engine';
 import { useI18n, type Key } from '../i18n.ts';
 import { duration } from '../lib/format.ts';
+import { canSimulate } from '../lib/simulator.ts';
 import { useApp, useNetwork } from '../state/app.tsx';
 
 /** How to go, as the row of a maps app: by bus (the app's own), car, on foot or by bike. */
@@ -105,10 +106,13 @@ export function TravelCard({
   mode,
   travel,
   loading,
+  onStart,
 }: {
   mode: TravelMode;
   travel: Travel | null | undefined;
   loading: boolean;
+  /** On foot: the walk followed in the app, turn by turn (`simulate`: in the tests). */
+  onStart?: (simulate: boolean) => void;
 }) {
   const t = useI18n();
   if (!travel) {
@@ -147,6 +151,19 @@ export function TravelCard({
         </div>
       </div>
       <p className="muted small">{t.t(`travel.${mode}.note` as Key)}</p>
+      {mode === 'walk' && onStart && (
+        <div className="detail__actions">
+          <button type="button" className="button button--primary" onClick={() => onStart(false)}>
+            <Footprints size={16} aria-hidden /> {t.t('guide.start')}
+          </button>
+          {/* Developers and the browser tests only: not translated, never in the phone app. */}
+          {canSimulate() && (
+            <button type="button" className="button" onClick={() => onStart(true)}>
+              <PlayCircle size={16} aria-hidden /> Simulate
+            </button>
+          )}
+        </div>
+      )}
       <a className="button button--block" href={navigate} target="_blank" rel="noopener noreferrer">
         <Navigation size={16} aria-hidden /> {t.t('travel.navigate')}
       </a>

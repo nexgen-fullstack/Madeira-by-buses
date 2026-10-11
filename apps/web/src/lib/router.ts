@@ -35,26 +35,79 @@ export function useRoute(): Route {
   return route;
 }
 
-export function navigate(path: string, query?: Record<string, string | undefined>): void {
+/**
+ * What the app keeps on each step of the history it made: that it made it, the address it
+ * was taken from, how many steps deep it is, and for a screen changed in place (the
+ * planner's places and options) the screen it was first opened from and its depth.
+ */
+interface Step {
+  inApp?: boolean;
+  prev?: string;
+  depth?: number;
+  origin?: string;
+  originDepth?: number;
+}
+
+const stepNow = (): Step => (history.state as Step | null) ?? {};
+
+/** A screen's address without its options. */
+const screenOf = (hash: string) => hash.replace(/^#\/?/, '').split('?')[0] ?? '';
+
+const hashOf = (path: string, query?: Record<string, string | undefined>) => {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(query ?? {})) if (v !== undefined && v !== '') q.set(k, v);
   const qs = q.toString();
-  location.hash = `#/${path}${qs ? `?${qs}` : ''}`;
-  // Marks the entry as reached from inside the app, so "back" can return to it.
+  return `#/${path}${qs ? `?${qs}` : ''}`;
+};
+
+export function navigate(path: string, query?: Record<string, string | undefined>): void {
+  const from = location.hash;
+  const was = stepNow();
+  location.hash = hashOf(path, query);
+  // Marks the entry as reached from inside the app, so "back" can return to it, and where
+  // from: the same screen changed keeps the screen it was opened from.
+  const same = screenOf(from) === screenOf(location.hash);
+  const step: Step = {
+    inApp: true,
+    prev: from,
+    depth: (was.depth ?? 0) + 1,
+    origin: same ? was.origin : from,
+    originDepth: same ? was.originDepth : (was.depth ?? 0),
+  };
   try {
-    history.replaceState({ ...(history.state as object | null), inApp: true }, '');
+    history.replaceState({ ...(history.state as object | null), ...step }, '');
   } catch {
     // History state unavailable (sandboxed frames): back falls back to the planner.
   }
 }
 
+/**
+ * Back to `path` with `query`: a step back through the history when that is the screen
+ * before (the list of ways after one of them), or else opened anew.
+ */
+export function backTo(path: string, query?: Record<string, string | undefined>): void {
+  if (stepNow().prev === hashOf(path, query)) history.back();
+  else navigate(path, query);
+}
+
+/**
+ * Back to the screen another one was opened from, before it was changed in place (a trail
+ * the planner was opened from with the way to it): false when it was not opened from one
+ * or that was the same kind of screen (`kind`, the planner from the planner).
+ */
+export function backToOrigin(kind: string): boolean {
+  const { origin, depth, originDepth } = stepNow();
+  if (!origin || depth === undefined || originDepth === undefined || depth <= originDepth)
+    return false;
+  if (screenOf(origin).split('/')[0] === kind || screenOf(origin) === '') return false;
+  history.go(originDepth - depth);
+  return true;
+}
+
 /** The same screen another way (a trail walked from its end): no new step to go back through. */
 export function replaceRoute(path: string, query?: Record<string, string | undefined>): void {
-  const q = new URLSearchParams();
-  for (const [k, v] of Object.entries(query ?? {})) if (v !== undefined && v !== '') q.set(k, v);
-  const qs = q.toString();
   const state = history.state as object | null;
-  location.replace(`#/${path}${qs ? `?${qs}` : ''}`);
+  location.replace(hashOf(path, query));
   try {
     history.replaceState(state, '');
   } catch {

@@ -160,6 +160,23 @@ export function vibrate(pattern: number[]): void {
 }
 
 /**
+ * Says `text` aloud in the language of `locale` (a turn on foot), over anything said
+ * before; nothing where the phone cannot speak.
+ */
+export function speak(text: string, locale: string): void {
+  try {
+    const synth = window.speechSynthesis;
+    if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return;
+    synth.cancel();
+    const words = new SpeechSynthesisUtterance(text);
+    words.lang = locale;
+    synth.speak(words);
+  } catch {
+    // No voice here: the card on the screen and the vibration tell it.
+  }
+}
+
+/**
  * Keeps the screen on (during a ride). Returns a function that releases it.
  * The website re-acquires the lock when the page becomes visible again, as
  * browsers drop it whenever the page is hidden.

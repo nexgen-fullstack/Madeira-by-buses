@@ -16,10 +16,16 @@ import { useI18n } from '../i18n.ts';
 import { isNative } from '../lib/device.ts';
 import { clock } from '../lib/format.ts';
 import { encodePlace } from '../lib/itinerary.ts';
+import { hasView } from '@madeirabus/engine';
+import { WalkGuide } from '../components/WalkGuide.tsx';
 import {
-  FLAG_FOOT,
+  flagPoint,
+  pairFlags,
   RIDE_WIDTH,
   rideColor,
+  VIEW_WALK,
+  WALK_INK,
+  type FlagLook,
   type MapContent,
   type MapPoint,
 } from '../lib/mapContent.ts';
@@ -32,7 +38,7 @@ import { routeColor } from '../lib/color.ts';
 export function TripView() {
   const t = useI18n();
   const { net } = useNetwork();
-  const { trip, setTrip } = useApp();
+  const { trip, setTrip, settings } = useApp();
   const tracking = useTripTracking();
   const [driver, setDriver] = useState(false);
   const {
@@ -45,36 +51,114 @@ export function TripView() {
     phase = 'ride',
   } = tracking ?? {};
 
+  const walk = tracking?.walk;
+  const position = tracking?.position;
   const content = useMemo<MapContent | undefined>(() => {
+    // On foot: the walk from its start flag to its chequered one, and the walker on it.
+    const walkLine = walk && {
+      coords: walk.path,
+      color: hasView(walk.leg) ? VIEW_WALK : WALK_INK,
+      dashed: true,
+    };
+    const walkFlags = walk
+      ? [
+          flagPoint(
+            walk.path[0]!,
+            false,
+            { mode: 'walk', color: walkLine!.color },
+            walk.leg.from.name,
+          ),
+          flagPoint(
+            walk.path.at(-1)!,
+            true,
+            { mode: 'walk', color: walkLine!.color },
+            walk.leg.to.name,
+            {
+              label: walk.leg.to.name,
+            },
+          ),
+        ]
+      : [];
+    const me: MapPoint[] = position && !trip?.simulate ? [{ ...position, kind: 'user' }] : [];
+    if (walk && phase !== 'ride') {
+      return {
+        lines: [walkLine!],
+        points: [...walkFlags, ...(position ? [{ ...position, kind: 'user' as const }] : [])],
+        fitKey: `trip:walk:${phase}:${rideIndex}`,
+        fit: walk.path,
+        focus: 'trip',
+      };
+    }
     if (!setup || !ride) return undefined;
     const color = routeColor(net.routes[ride.route]!);
     const last = setup.stops.length - 1;
-    // Boarded at the start flag, left at the chequered one, on the bus's side of the road.
+    // Boarded at the start flag, left at the chequered one, on the bus's side of the road,
+    // both in the colour the ride is drawn in with its number.
     const ends = [setup.shape[0], setup.shape.at(-1)];
+    const look: FlagLook = {
+      mode: 'bus',
+      color: rideColor(rideIndex),
+      text: net.routes[ride.route]!.short,
+    };
     const points: MapPoint[] = setup.stops.map((s, i) => {
       const at = (i === 0 ? ends[0] : i === last ? ends[1] : undefined) ?? s;
-      return {
-        lat: at.lat,
-        lon: at.lon,
-        kind: i === last ? 'alight' : i === 0 ? 'board' : 'stop',
-        color: i === 0 || i === last ? '#ffffff' : '#14181F',
-        ...(i === 0 || i === last ? { fill: FLAG_FOOT } : {}),
-        label: i === 0 || i === last ? s.name : undefined,
-      };
+      if (i === 0 || i === last) return flagPoint(at, i === last, look, s.name, { label: s.name });
+      return { lat: at.lat, lon: at.lon, kind: 'stop', color: '#14181F' };
     });
     if (state) points.push({ ...state.position, kind: 'bus', color });
-    // The ride in the colour it has on the route, alone on the map.
+    // The ride in the colour it has on the route, alone on the map (with the walk to it
+    // while the bus is awaited), and where the phone is.
+    const lines: MapContent['lines'] = [
+      { coords: setup.shape, color: rideColor(rideIndex), width: RIDE_WIDTH, arrows: true },
+    ];
+    if (walkLine) lines.unshift(walkLine);
+    const all = [...walkFlags, ...points, ...me];
+    pairFlags(all);
     return {
-      lines: [
-        { coords: setup.shape, color: rideColor(rideIndex), width: RIDE_WIDTH, arrows: true },
-      ],
-      points,
-      fitKey: `trip:${rideIndex}`,
-      fit: setup.shape,
+      lines,
+      points: all,
+      fitKey: `trip:${rideIndex}${walk ? ':walk' : ''}`,
+      fit: [...setup.shape, ...(walk?.path ?? [])],
       focus: 'trip',
     };
-  }, [setup, ride, net, state, rideIndex]);
+  }, [setup, ride, net, state, rideIndex, walk, position, phase, trip?.simulate]);
   useMapContent(content);
+
+  if (trip && tracking && phase === 'walk') {
+    return (
+      <div className="trip">
+        <div className="trip__header">
+          <span className="trip__walk-badge" aria-hidden>
+            <Footprints size={22} />
+          </span>
+          <div className="trip__headsign">
+            <div className="strong">{t.t('guide.title')}</div>
+            <div className="muted small">{trip.simulate ? 'Simulation' : 'GPS'}</div>
+          </div>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => {
+              setTrip(undefined);
+              goBack('plan');
+            }}
+            aria-label={t.t('trip.end')}
+          >
+            <X size={20} />
+          </button>
+        </div>
+        {walk && (
+          <WalkGuide
+            path={walk.path}
+            position={position}
+            to={walk.leg.to.name}
+            speed={settings.walkSpeed}
+          />
+        )}
+        {tracking.gpsError && <p className="muted small">{t.t('trip.gpsDenied')}</p>}
+      </div>
+    );
+  }
 
   if (!trip || !tracking || !ride || !setup) {
     return (
@@ -141,6 +225,14 @@ export function TripView() {
 
       {phase === 'ride' && (
         <>
+          {walk && (
+            <WalkGuide
+              path={walk.path}
+              position={position}
+              to={walk.leg.to.name}
+              speed={settings.walkSpeed}
+            />
+          )}
           <section className={`trip__status trip__status--${status}`} aria-live="assertive">
             <div className="trip__headline">
               {status === 'next' && <Megaphone size={22} aria-hidden />}
@@ -268,7 +360,23 @@ export function TripView() {
           )}
         </section>
       )}
+      {phase === 'transfer' && walk && (
+        <WalkGuide
+          path={walk.path}
+          position={position}
+          to={walk.leg.to.name}
+          speed={settings.walkSpeed}
+        />
+      )}
 
+      {phase === 'done' && walk && (
+        <WalkGuide
+          path={walk.path}
+          position={position}
+          to={walk.leg.to.name}
+          speed={settings.walkSpeed}
+        />
+      )}
       {phase === 'done' && (
         <section className="trip__status trip__status--arrived">
           <div className="trip__headline">{t.t('trip.done')}</div>

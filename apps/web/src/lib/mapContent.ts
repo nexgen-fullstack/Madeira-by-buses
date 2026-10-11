@@ -58,6 +58,26 @@ export interface MapPoint extends LatLon {
    * north), so it is drawn on its own way's side, as that way's line is.
    */
   heading?: number;
+  /** How a start or finish flag looks: what goes that way, in its colour (plain when not given). */
+  flag?: FlagLook;
+  /** The place's name, told while a finger is held on its flag (not written on the map). */
+  name?: string;
+}
+
+/** What a way is gone by: on foot, by bus, by car, by bike, or along a hiking trail. */
+export type FlagMode = 'walk' | 'bus' | 'car' | 'bike' | 'trail';
+
+/**
+ * A flag of a way: a bus's in the colour of its line with its number (a start flag of
+ * that colour, a chequered one of that colour and black), the others green and chequered
+ * black and white with a walker, a car, a bike or a hiker in the way's colour.
+ */
+export interface FlagLook {
+  mode: FlagMode;
+  /** Hex colour with '#'. */
+  color: string;
+  /** The number of the bus. */
+  text?: string;
 }
 
 export interface MapContent {
@@ -76,8 +96,6 @@ export interface MapContent {
    * the app opens. The first ones stay when they crowd each other far out.
    */
   scenic?: ScenicSpot[];
-  /** The hiking trails shown whatever the layers say: the trails tab. */
-  trails?: boolean;
   /** Where the buses shown run on the Via Rápida: a violet band under them, named. */
   expressways?: LatLon[][];
 }
@@ -93,6 +111,8 @@ export interface ScenicSpot extends LatLon {
   href?: string;
   /** Its name shown only while a finger is held on it (among the trails, which it would hide). */
   quiet?: boolean;
+  /** A photo along a hiking trail: shown or not with the trails' photos, not the camera's. */
+  trail?: boolean;
 }
 
 export const EMPTY_CONTENT: MapContent = { lines: [], points: [] };
@@ -134,6 +154,29 @@ export const RUN_WIDTH = 4.5;
 /** A walk on the map, in navy; one with a view (along the sea), in the deep cyan of the logo's wave. */
 export const WALK_INK = '#002F85';
 export const VIEW_WALK = '#00838F';
+
+/**
+ * A start flag (or a chequered one, `finish`) at `p` of a way gone as `look` says, with the
+ * place's `name` told while a finger is held on it.
+ */
+export function flagPoint(
+  p: LatLon,
+  finish: boolean,
+  look: FlagLook,
+  name?: string,
+  extra?: Partial<MapPoint>,
+): MapPoint {
+  return {
+    lat: p.lat,
+    lon: p.lon,
+    kind: finish ? 'alight' : 'board',
+    color: '#ffffff',
+    fill: FLAG_FOOT,
+    flag: look,
+    ...(name ? { name } : {}),
+    ...extra,
+  };
+}
 
 /** A walk along the streets on their pavements, or as the crow flies without the streets. */
 export function walkPath(leg: {
@@ -182,66 +225,51 @@ export function itineraryContent(
       const to = rides[i + 1]?.[0];
       const path = walkPath(leg);
       const coords = [...(from ? [from] : []), ...path, ...(to ? [to] : [])];
-      lines.push({ coords, color: hasView(leg) ? VIEW_WALK : WALK_INK, dashed: true });
-      // A walk, as a bus, from a start flag to a chequered one: where the journey starts on
-      // foot, where it is walked on from the bus, and where it ends; the names of the places
-      // walked from and to (a stop's name stands at its bus's flag).
+      const color = hasView(leg) ? VIEW_WALK : WALK_INK;
+      lines.push({ coords, color, dashed: true });
+      // A walk, as a bus, from a start flag to a chequered one, each with a walker: where the
+      // journey starts on foot, where it is walked on from the bus, and where it ends; the
+      // names of the places walked from and to (a stop's name stands at its bus's flag).
       const ends = i === 0 || i === it.legs.length - 1;
       if (pathLength(coords) >= (ends ? END_WALK : TRANSFER_WALK)) {
-        const a = coords[0]!;
-        const b = coords.at(-1)!;
         const fromName = i === 0 ? leg.from.name : '';
         const toName = i === it.legs.length - 1 ? leg.to.name : '';
-        points.push({
-          lat: a.lat,
-          lon: a.lon,
-          kind: 'board',
-          color: '#ffffff',
-          fill: FLAG_FOOT,
-          ...(fromName ? { label: fromName } : {}),
-        });
-        points.push({
-          lat: b.lat,
-          lon: b.lon,
-          kind: 'alight',
-          color: '#ffffff',
-          fill: FLAG_FOOT,
-          ...(toName ? { label: toName } : {}),
-        });
+        const look: FlagLook = { mode: 'walk', color };
+        points.push(
+          flagPoint(coords[0]!, false, look, leg.from.name, fromName ? { label: fromName } : {}),
+        );
+        points.push(
+          flagPoint(coords.at(-1)!, true, look, leg.to.name, toName ? { label: toName } : {}),
+        );
       }
       return;
     }
     const coords = rides[i]!;
     const start = coords[0] ?? leg.from;
     const end = coords.at(-1) ?? leg.to;
+    const color = rideColor(ride++);
+    const short = net.routes[leg.route]!.short;
     lines.push({
       coords,
-      color: rideColor(ride++),
+      color,
       width: RIDE_WIDTH,
-      label: net.routes[leg.route]!.short,
+      label: short,
       arrows: true,
       route: leg.route,
       pattern: leg.pattern,
       board: leg.from.stop,
     });
-    points.push({
-      lat: start.lat,
-      lon: start.lon,
-      kind: 'board',
-      color: '#ffffff',
-      fill: FLAG_FOOT,
-      label: leg.from.name,
-      stops: [leg.from.stop!],
-    });
-    points.push({
-      lat: end.lat,
-      lon: end.lon,
-      kind: 'alight',
-      color: '#ffffff',
-      fill: FLAG_FOOT,
-      label: leg.to.name,
-      stops: [leg.to.stop!],
-    });
+    // The bus's flags in the colour it is drawn in, with its number.
+    const look: FlagLook = { mode: 'bus', color, text: short };
+    points.push(
+      flagPoint(start, false, look, leg.from.name, {
+        label: leg.from.name,
+        stops: [leg.from.stop!],
+      }),
+    );
+    points.push(
+      flagPoint(end, true, look, leg.to.name, { label: leg.to.name, stops: [leg.to.stop!] }),
+    );
     for (const s of leg.stops.slice(1, -1)) {
       const st = net.stops[s.stop]!;
       points.push({ lat: st.lat, lon: st.lon, kind: 'stop', color: INK, stops: [s.stop] });
@@ -272,18 +300,19 @@ const pathLength = (coords: readonly LatLon[]) =>
 const ONE_PLACE = 6;
 
 /**
- * Where a bus is left and the next boarded at one place, the two flags stand a little
- * apart, and the stop's name is written once when it is the same stop.
+ * Where a way ends and the next starts at one place (within `near` m), the chequered flag
+ * and the start flag stand side by side, a little apart (the start where the other ends),
+ * and the place's name is written once when it is the same place.
  */
-function pairFlags(points: MapPoint[]): void {
+export function pairFlags(points: MapPoint[], near = ONE_PLACE): void {
   for (const board of points) {
-    if (board.kind !== 'board') continue;
-    const alight = points.find(
-      (p) => p.kind === 'alight' && p !== board && haversine(p, board) < ONE_PLACE,
-    );
+    if (board.kind !== 'board' || board.pair) continue;
+    const alight = points.find((p) => p.kind === 'alight' && !p.pair && haversine(p, board) < near);
     if (!alight) continue;
     alight.pair = true;
     board.pair = true;
+    board.lat = alight.lat;
+    board.lon = alight.lon;
     if (alight.label === board.label) {
       board.label = undefined;
     } else if (alight.label && board.label) {
@@ -305,28 +334,21 @@ export const BIKE_GREEN = '#1E8A4C';
  * (each with a white edge on any map), a walk as the dots of a walk; a start flag where it
  * starts and a chequered one where it goes.
  */
-export function travelContent(travel: Travel): MapContent {
+export function travelContent(travel: Travel, names?: { from?: string; to?: string }): MapContent {
   const first = travel.path[0]!;
   const last = travel.path[travel.path.length - 1]!;
+  const color = travel.mode === 'walk' ? WALK_INK : travel.mode === 'car' ? CAR_BLUE : BIKE_GREEN;
   const lines: MapLine[] =
     travel.mode === 'walk'
-      ? [{ coords: travel.path, color: WALK_INK, dashed: true }]
-      : [
-          {
-            coords: travel.path,
-            color: travel.mode === 'car' ? CAR_BLUE : BIKE_GREEN,
-            width: travel.mode === 'car' ? 7 : 5.5,
-            arrows: true,
-          },
-        ];
+      ? [{ coords: travel.path, color, dashed: true }]
+      : [{ coords: travel.path, color, width: travel.mode === 'car' ? 7 : 5.5, arrows: true }];
   const key = (p: LatLon) => `${p.lat.toFixed(5)},${p.lon.toFixed(5)}`;
+  const look: FlagLook = { mode: travel.mode, color };
   return {
     lines,
-    // As every way: a start flag where it starts, a chequered one where it ends.
-    points: [
-      { ...first, kind: 'board', color: '#ffffff', fill: FLAG_FOOT },
-      { ...last, kind: 'alight', color: '#ffffff', fill: FLAG_FOOT },
-    ],
+    // As every way: a start flag where it starts, a chequered one where it ends, with a
+    // walker, a car or a bike on them in the way's colour.
+    points: [flagPoint(first, false, look, names?.from), flagPoint(last, true, look, names?.to)],
     fitKey: `travel:${travel.mode}:${key(first)}>${key(last)}`,
     fit: travel.path,
     focus: `travel:${travel.mode}`,

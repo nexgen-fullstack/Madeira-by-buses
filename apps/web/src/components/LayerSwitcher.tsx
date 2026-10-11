@@ -92,7 +92,14 @@ export function LayerSwitcher({
                 <input
                   type="checkbox"
                   checked={value[key]}
-                  onChange={(e) => onChange({ ...value, [key]: e.target.checked })}
+                  onChange={(e) =>
+                    onChange({
+                      ...value,
+                      [key]: e.target.checked,
+                      // The trails put on come with their photos, as by their button.
+                      ...(key === 'trails' && e.target.checked ? { trailPhotos: true } : {}),
+                    })
+                  }
                 />
               </label>
             ))}

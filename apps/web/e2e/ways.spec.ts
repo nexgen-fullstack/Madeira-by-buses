@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { pinDemoData, raiseSheet } from './demo.ts';
+import { allowSimulation, pinDemoData, raiseSheet } from './demo.ts';
 
 // Wednesday 7 Oct 2026, 09:00 in Madeira. Demo data: its timetable never changes.
 test.beforeEach(async ({ page }) => {
@@ -8,6 +8,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('by bus, or on foot or by bike beside it, as in a maps app', async ({ page }) => {
+  await allowSimulation(page);
   await page.goto('./');
   await raiseSheet(page);
   await page.getByRole('combobox', { name: 'Куди' }).fill('Monte');
@@ -36,6 +37,17 @@ test('by bus, or on foot or by bike beside it, as in a maps app', async ({ page 
   await expect(page.locator('.travel--bike')).toBeVisible();
   await modes.getByRole('button', { name: /^Автобус: / }).click();
   await expect(page.locator('.it-card').first()).toBeVisible();
+  // On foot again, followed in the app, turn by turn, over the map.
+  await modes.getByRole('button', { name: /^Пішки: \d/ }).click();
+  await card.getByRole('button', { name: 'Simulate' }).click();
+  await expect(page).toHaveURL(/#\/trip/);
+  const guide = page.locator('.walk-guide');
+  await expect(guide).toContainText('Пішки до «Monte');
+  await expect(guide.getByRole('button', { name: 'Голосові підказки' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.locator('.map-wrap .walk-guide')).toBeVisible();
 });
 
 test('the hiking trails: by kind and region, each with its buses, on the map', async ({ page }) => {

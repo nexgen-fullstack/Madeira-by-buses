@@ -32,6 +32,8 @@ export interface Settings {
   /** What the best way should be best at: the balance, fewer changes or less walking. */
   route: RoutePreference;
   map: MapLayers;
+  /** The turns on foot said aloud (and felt) as they come, as a maps app does (on: unset). */
+  walkHints?: boolean;
 }
 
 /** Real timetables, or the invented whole-island demo network. */
@@ -153,7 +155,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Most visitors pay cash on the bus; GIRO only for those who said they have the card.
     const payment = stored.paymentChosen ? stored.payment : 'cash';
     const route = stored.route in ROUTE_PREFERENCES ? stored.route : 'best';
-    return { ...stored, payment, route, map: { ...DEFAULT_LAYERS, ...stored.map } };
+    // The app opens on the island with its places with a view, no trails: the trails button
+    // then puts them on with their photos at once.
+    const map = {
+      ...DEFAULT_LAYERS,
+      ...stored.map,
+      scenic: true,
+      trails: false,
+      trailPhotos: true,
+    };
+    return { ...stored, payment, route, map };
   });
   const [data, setData] = useState<DataState>({ status: 'loading' });
   const [dataset] = useState(pinnedDataset);

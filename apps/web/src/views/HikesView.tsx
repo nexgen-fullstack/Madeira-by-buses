@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bus, Clock, MoveHorizontal, Repeat, TrendingUp } from 'lucide-react';
 import { trailMinutes, type Trail, type TrailKind } from '@madeirabus/engine';
 import { useMapContent } from '../components/mapContext.tsx';
@@ -6,9 +6,10 @@ import { useI18n, type Key } from '../i18n.ts';
 import { duration } from '../lib/format.ts';
 import { EMPTY_CONTENT, ISLAND, type MapContent } from '../lib/mapContent.ts';
 import { photoUrl, trailPhoto } from '../lib/photos.ts';
+import { navigate } from '../lib/router.ts';
 import { REGIONS, regionKey } from '../lib/scenic.ts';
 import { nearestStop, startOf, TRAIL_KINDS, trailRegion, useTrails } from '../lib/trails.ts';
-import { useNetwork } from '../state/app.tsx';
+import { useApp, useNetwork } from '../state/app.tsx';
 
 /** Kilometres with one decimal, as the language writes them. */
 export const trailKm = (m: number, locale: string) =>
@@ -29,7 +30,15 @@ function TrailCard({ trail, bus }: { trail: Trail; bus?: number }) {
   const t = useI18n();
   const pic = trailPhoto(trail.id);
   return (
-    <a className={`trail-card${pic ? ' trail-card--photo' : ''}`} href={`#/hikes/${trail.id}`}>
+    <a
+      className={`trail-card${pic ? ' trail-card--photo' : ''}`}
+      href={`#/hikes/${trail.id}`}
+      onClick={(e) => {
+        // As a step of the app, so "back" comes to the list where it was.
+        e.preventDefault();
+        navigate(`hikes/${trail.id}`);
+      }}
+    >
       {pic && (
         <img
           className="trail-card__photo"
@@ -73,6 +82,28 @@ function TrailCard({ trail, bus }: { trail: Trail; bus?: number }) {
   );
 }
 
+/** The trails tab's filters, kept while the app is open. */
+const shownFilters: { kind: TrailKind | 'all'; busOnly: boolean } = { kind: 'all', busOnly: false };
+
+/**
+ * The trails on the map, with their photos, while the trails tab is open when they were
+ * off; put away again as it closes, unless the trails button was used meanwhile.
+ */
+function useTrailsWhileOpen() {
+  const { settings, setSettings } = useApp();
+  const layers = useRef(settings.map);
+  layers.current = settings.map;
+  useEffect(() => {
+    if (layers.current.trails) return;
+    setSettings({ map: { ...layers.current, trails: true, trailPhotos: true } });
+    return () => {
+      const now = layers.current;
+      if (now.trails && now.trailPhotos) setSettings({ map: { ...now, trails: false } });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
+
 /**
  * The trails tab: the island's official PR trails, its levadas and veredas, by region,
  * each with how long, how high and how far its start is from a bus; the trails on the map.
@@ -81,15 +112,17 @@ export function HikesView() {
   const t = useI18n();
   const { net } = useNetwork();
   const trails = useTrails();
-  const [kind, setKind] = useState<TrailKind | 'all'>('all');
-  const [busOnly, setBusOnly] = useState(false);
+  // The filters as they were left: back from a trail, the list is the same.
+  const [kind, setKindState] = useState<TrailKind | 'all'>(shownFilters.kind);
+  const [busOnly, setBusOnlyState] = useState(shownFilters.busOnly);
+  const setKind = (k: TrailKind | 'all') => setKindState((shownFilters.kind = k));
+  const setBusOnly = (f: (b: boolean) => boolean) =>
+    setBusOnlyState((b) => (shownFilters.busOnly = f(b)));
 
   useMapContent(
-    useMemo<MapContent>(
-      () => ({ ...EMPTY_CONTENT, trails: true, fitKey: 'island', fit: ISLAND }),
-      [],
-    ),
+    useMemo<MapContent>(() => ({ ...EMPTY_CONTENT, fitKey: 'island', fit: ISLAND }), []),
   );
+  useTrailsWhileOpen();
 
   // How far each trail's start is from a bus stop (m), where one is near.
   const bus = useMemo(

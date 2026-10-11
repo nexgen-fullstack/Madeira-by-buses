@@ -1730,6 +1730,90 @@ input[type='time'],
   flex: 1;
   min-width: 0;
 }
+.trip__walk-badge {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: #fff;
+  background: var(--navy);
+}
+/* On foot, turn by turn, as a maps app: the next turn large on a navy card. */
+.walk-guide {
+  border-radius: 18px;
+  padding: 14px 14px 12px;
+  margin-bottom: 12px;
+  color: #fff;
+  background: var(--navy);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 8px;
+}
+.walk-guide--there {
+  background: #1e8a4c;
+}
+/* Over the map's top, its buttons below it. */
+.walk-guide--over {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 4;
+  margin: 0;
+}
+.map-wrap--guided .map-tools {
+  top: calc(18px + var(--guide-h, 0px));
+}
+.map-wrap--guided .maplibregl-ctrl-top-right {
+  top: calc(8px + var(--guide-h, 0px));
+}
+.walk-guide__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.walk-guide__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 14%);
+}
+.walk-guide__text {
+  flex: 1;
+  min-width: 0;
+}
+.walk-guide__headline {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.walk-guide .muted {
+  color: rgb(255 255 255 / 78%);
+}
+.walk-guide__hints {
+  flex: none;
+  color: #fff;
+  background: rgb(255 255 255 / 14%);
+}
+.walk-guide__hints[aria-pressed='false'] {
+  color: rgb(255 255 255 / 60%);
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 40%);
+}
+.walk-guide__off {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-weight: 700;
+  color: #14181f;
+  background: var(--accent);
+}
 .trip__status {
   border-radius: 18px;
   padding: 16px;
@@ -1929,6 +2013,22 @@ input[type='time'],
 .map-tool[aria-pressed='true'] {
   color: #fff;
   background: #002f85;
+}
+/* The trails button's steps: with their photos (a camera on it), the lines alone (paler). */
+.map-tool--trails {
+  position: relative;
+}
+.map-tool__badge {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+}
+.map-tool--trails.map-tool--lines {
+  color: #002f85;
+  background: #dbe6f7;
+  box-shadow:
+    inset 0 0 0 2px #002f85,
+    0 2px 10px rgb(0 0 0 / 22%);
 }
 .map-tools,
 .maplibregl-ctrl-top-right > .maplibregl-ctrl {

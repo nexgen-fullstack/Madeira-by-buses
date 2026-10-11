@@ -12,7 +12,13 @@ import { useI18n } from '../i18n.ts';
 import { dayGroups, findOptions, firstDeparture, type Found } from '../lib/ahead.ts';
 import { aheadFrom, capitalise, dayAhead, parseTimeInput, toTimeInput } from '../lib/format.ts';
 import { useGeolocation } from '../lib/geolocation.ts';
-import { decodePlace, encodePlace, optionTags, type OptionTag } from '../lib/itinerary.ts';
+import {
+  decodePlace,
+  encodePlace,
+  optionTags,
+  walkItinerary,
+  type OptionTag,
+} from '../lib/itinerary.ts';
 import {
   EMPTY_CONTENT,
   ISLAND,
@@ -21,7 +27,7 @@ import {
   travelContent,
   type MapContent,
 } from '../lib/mapContent.ts';
-import { navigate, type Route } from '../lib/router.ts';
+import { backTo, navigate, type Route } from '../lib/router.ts';
 import { DESTINATIONS, hasPhoto, reachable, scenicSpots } from '../lib/scenic.ts';
 import { APP_NAME } from '../lib/site.ts';
 import { useNow } from '../lib/useNow.ts';
@@ -226,7 +232,7 @@ export function PlanView({ route }: { route: Route }) {
   const { travels, loading: travelling } = useTravels(from, to);
   const travelShown = mode !== 'bus' ? travels[mode] : undefined;
   const mapContent = useMemo<MapContent>(() => {
-    if (travelShown) return travelContent(travelShown);
+    if (travelShown) return travelContent(travelShown, { from: from?.name, to: to?.name });
     if (selectedIt) return itineraryContent(net, selectedIt, focusLeg, true);
     if (results?.[0]) return itineraryContent(net, results[0]);
     // Nothing chosen yet: the whole island as the app opens, fitted to the screen whichever
@@ -266,7 +272,9 @@ export function PlanView({ route }: { route: Route }) {
         date={selectedDay}
         ahead={Boolean(found?.past) || selectedDay !== found?.date}
         onFocusLeg={setFocusLeg}
-        onBack={() => setParams({ i: undefined })}
+        onBack={() =>
+          backTo('plan', Object.fromEntries([...q.entries()].filter(([k]) => k !== 'i')))
+        }
         onStart={(simulate) => {
           setTrip({
             itinerary: selectedIt,
@@ -379,7 +387,24 @@ export function PlanView({ route }: { route: Route }) {
           loading={travelling}
         />
       )}
-      {mode !== 'bus' && <TravelCard mode={mode} travel={travelShown} loading={travelling} />}
+      {mode !== 'bus' && (
+        <TravelCard
+          mode={mode}
+          travel={travelShown}
+          loading={travelling}
+          onStart={(simulate) => {
+            if (!travelShown || !from || !to) return;
+            const place = (p: PlaceValue) => ({ name: p.name, lat: p.lat, lon: p.lon });
+            setTrip({
+              itinerary: walkItinerary(travelShown, place(from), place(to), now.time),
+              date: now.date,
+              simulate,
+              generatedAt: net.bundle.generatedAt,
+            });
+            navigate('trip');
+          }}
+        />
+      )}
 
       {mode === 'bus' && loading && !results?.length && (
         <p className="plan__status" role="status">

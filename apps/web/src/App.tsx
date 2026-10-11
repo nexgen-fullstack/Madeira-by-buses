@@ -19,7 +19,15 @@ import { StatusBanners } from './components/DemoBanner.tsx';
 import { MapContentContext, MapProvider } from './components/mapContext.tsx';
 import { useI18n, type Key } from './i18n.ts';
 import { listenBackButton, useBack } from './lib/back.ts';
-import { goBack, navigate, onLeave, useRoute, type Route } from './lib/router.ts';
+import {
+  backTo,
+  backToOrigin,
+  goBack,
+  navigate,
+  onLeave,
+  useRoute,
+  type Route,
+} from './lib/router.ts';
 import { APP_NAME } from './lib/site.ts';
 import { destination } from './lib/scenic.ts';
 import { AppProvider, useApp } from './state/app.tsx';
@@ -101,7 +109,7 @@ function Screen() {
       );
     case 'hikes':
       return sub !== undefined ? (
-        <HikeView key={sub} id={sub} reversed={route.query.get('rev') === '1'} />
+        <HikeView key={sub} id={sub} rev={route.query.get('rev')} />
       ) : (
         <HikesView />
       );
@@ -242,11 +250,12 @@ function Shell() {
     if (!where || where === 'plan') {
       if (q.has('i')) {
         const rest = Object.fromEntries([...q.entries()].filter(([k]) => k !== 'i'));
-        navigate('plan', rest);
+        backTo('plan', rest);
         return true;
       }
       if ([...q.keys()].length > 0) {
-        navigate('plan');
+        // Opened from another screen (a trail, a stop, a place): back to it, as it was.
+        if (!backToOrigin('plan')) navigate('plan');
         return true;
       }
       return false;

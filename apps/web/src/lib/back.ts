@@ -29,6 +29,11 @@ export function handleBack(): boolean {
   return false;
 }
 
+// While developing, the phone's back button for the browser console and scripted checks.
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  (window as unknown as { mbBack?: () => boolean }).mbBack = handleBack;
+}
+
 /**
  * In the Android app, routes the button to the handlers; `onUnhandled` (the
  * start screen) decides whether to close the app. Returns a way to stop.

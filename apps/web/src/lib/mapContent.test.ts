@@ -11,6 +11,7 @@ import {
   routeContent,
   RUN_WIDTH,
   travelContent,
+  WALK_INK,
   WAY_TURQUOISE,
   WAY_YELLOW,
 } from './mapContent.ts';
@@ -286,6 +287,17 @@ describe('a route on the map', () => {
       // And ends at a chequered one at the beach: no pin over it.
       ['alight', 'Praia', undefined],
     ]);
+    // The walks' flags with a walker, the bus's in its colour with its number.
+    expect(flags.map((p) => p.flag)).toEqual([
+      { mode: 'walk', color: WALK_INK },
+      { mode: 'walk', color: WALK_INK },
+      { mode: 'bus', color: RIDE_COLORS[0], text: '207' },
+      { mode: 'bus', color: RIDE_COLORS[0], text: '207' },
+      { mode: 'walk', color: WALK_INK },
+      { mode: 'walk', color: WALK_INK },
+    ]);
+    // Each place's name told on a held finger, where the map does not write it.
+    expect(flags[1]!.name).toBe('Funchal');
     expect(c.points.some((p) => p.kind === 'destination' || p.kind === 'origin')).toBe(false);
   });
 
@@ -316,6 +328,11 @@ describe('a way by car, on foot or by bike', () => {
     const car = travelContent({ mode: 'car', path, length: 6000, seconds: 600 });
     expect(car.lines).toMatchObject([{ color: CAR_BLUE, arrows: true }]);
     expect(car.points.map((p) => p.kind)).toEqual(['board', 'alight']);
+    // A car in the flags, in the car's blue.
+    expect(car.points.map((p) => p.flag)).toEqual([
+      { mode: 'car', color: CAR_BLUE },
+      { mode: 'car', color: CAR_BLUE },
+    ]);
     expect(car.points[1]).toMatchObject({ lat: 32.65, lon: -16.97 });
     const walk = travelContent({ mode: 'walk', path, length: 6000, seconds: 4800 });
     expect(walk.lines).toMatchObject([{ dashed: true }]);
@@ -323,6 +340,7 @@ describe('a way by car, on foot or by bike', () => {
     expect(walk.fitKey).not.toBe(car.fitKey);
     const bike = travelContent({ mode: 'bike', path, length: 6000, seconds: 1500 });
     expect(bike.lines[0]!.color).toBe(BIKE_GREEN);
+    expect(bike.points[0]!.flag).toEqual({ mode: 'bike', color: BIKE_GREEN });
   });
 });
 

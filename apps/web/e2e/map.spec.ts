@@ -216,6 +216,19 @@ test('the camera button hides the photos of the places with a view, and shows th
   await expect(page.locator('.scenic-pin').first()).toBeAttached();
   // With the trails, the photos along them too, each a tap from its trail.
   const before = await page.locator('.scenic-pin').count();
-  await page.getByRole('button', { name: 'Піші стежки' }).click();
+  const trails = page.getByRole('button', { name: 'Піші стежки' });
+  await expect(trails).toHaveAttribute('data-step', 'off');
+  await trails.click();
+  await expect(trails).toHaveAttribute('data-step', 'photos');
   await expect.poll(() => page.locator('.scenic-pin').count()).toBeGreaterThan(before + 50);
+  // A second tap: the trails without their photos; a third, no trails at all.
+  await trails.click();
+  await expect(trails).toHaveAttribute('data-step', 'lines');
+  await expect(page.locator('.scenic-pin')).toHaveCount(before);
+  await trails.click();
+  await expect(trails).toHaveAttribute('aria-pressed', 'false');
+  // The camera hides the views' photos only: the trails' stay.
+  await trails.click();
+  await camera.click();
+  await expect.poll(() => page.locator('.scenic-pin').count()).toBeGreaterThan(50);
 });

@@ -9,17 +9,22 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  cumulativeDistances,
   madeiraNow,
+  pointAlong,
   RideTracker,
+  type Leg,
   type Network,
   type RideLeg,
   type TrackedStop,
   type TrackState,
+  type WalkLeg,
 } from '@madeirabus/engine';
 import { useI18n } from '../i18n.ts';
 import { askNotify, canNotify, keepScreenOn, notify, vibrate } from '../lib/device.ts';
 import { useGeolocation } from '../lib/geolocation.ts';
 import { ridesOf } from '../lib/itinerary.ts';
+import { walkPath } from '../lib/mapContent.ts';
 import type { LatLon } from '@madeirabus/engine';
 import { RideSimulator } from '../lib/simulator.ts';
 import { useApp, type ActiveTrip } from './app.tsx';
@@ -31,6 +36,15 @@ import { useApp, type ActiveTrip } from './app.tsx';
  */
 
 const SPEEDUP = 20;
+/** A walker in the simulation (m/s), before the speed-up. */
+const SIM_WALK = 1.4;
+
+/** The walk being walked now: to the first bus, between two, from the last, or all the way. */
+export interface WalkNow {
+  leg: WalkLeg;
+  /** Its way as the map draws it. */
+  path: LatLon[];
+}
 
 export interface RideSetup {
   stops: TrackedStop[];
@@ -46,7 +60,12 @@ export interface TripTracking {
   nextRide?: RideLeg;
   setup?: RideSetup;
   state?: TrackState;
-  phase: 'ride' | 'transfer' | 'done';
+  /** `walk`: a journey on foot all the way. */
+  phase: 'ride' | 'transfer' | 'done' | 'walk';
+  /** Where the phone is (in the simulation, where the bus or the walker is). */
+  position?: LatLon & { accuracy?: number };
+  /** The walk under way, with turn-by-turn guidance. */
+  walk?: WalkNow;
   gpsError?: 'denied' | 'unavailable';
   notifyOn: boolean;
   enableNotify: () => void;
@@ -89,7 +108,9 @@ function TripEngine({
   const t = useI18n();
   const { setTrip } = useApp();
   const [rideIndex, setRideIndex] = useState(() => trip.ride ?? 0);
-  const [phase, setPhase] = useState<'ride' | 'transfer' | 'done'>('ride');
+  const [phase, setPhase] = useState<TripTracking['phase']>(() =>
+    trip.itinerary.rides === 0 ? 'walk' : 'ride',
+  );
   const [state, setState] = useState<TrackState | undefined>();
   const [notifyOn, setNotifyOn] = useState(false);
 
@@ -202,6 +223,42 @@ function TripEngine({
     return () => window.clearTimeout(id);
   }, [state?.status, phase, nextRide, trip.simulate]);
 
+  // The walk under way: to the first bus while it is awaited, to the next bus at a change,
+  // from the last bus, or all the way.
+  const legs = trip.itinerary.legs;
+  const waiting = !state || state.status === 'waiting';
+  const walkLeg = useMemo(() => {
+    const isWalk = (l: Leg | undefined): l is WalkLeg => l?.kind === 'walk';
+    if (phase === 'walk') return legs.find(isWalk);
+    if (phase === 'ride')
+      return rideIndex === 0 && waiting && isWalk(legs[0]) ? legs[0] : undefined;
+    if (phase === 'transfer' && ride && nextRide) {
+      return legs.slice(legs.indexOf(ride) + 1, legs.indexOf(nextRide)).find(isWalk);
+    }
+    const last = legs.at(-1);
+    return phase === 'done' && isWalk(last) ? last : undefined;
+  }, [legs, phase, rideIndex, waiting, ride, nextRide]);
+  const walk = useMemo<WalkNow | undefined>(
+    () => (walkLeg ? { leg: walkLeg, path: walkPath(walkLeg) } : undefined),
+    [walkLeg],
+  );
+
+  // In the simulation, a walker going along it (but not to the first bus: the bus comes).
+  const [walker, setWalker] = useState<LatLon | undefined>();
+  useEffect(() => {
+    setWalker(undefined);
+    if (!trip.simulate || !walk || phase === 'ride') return;
+    const cum = cumulativeDistances(walk.path);
+    const started = performance.now();
+    const id = window.setInterval(() => {
+      const gone = ((performance.now() - started) / 1000) * SIM_WALK * SPEEDUP;
+      setWalker(pointAlong(walk.path, cum, gone));
+      if (gone > cum.at(-1)! + 30) window.clearInterval(id);
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [trip.simulate, walk, phase]);
+  const position = trip.simulate ? (phase === 'ride' ? state?.position : walker) : geo.position;
+
   const board = useCallback(() => {
     setRideIndex((i) => i + 1);
     setState(undefined);
@@ -228,6 +285,8 @@ function TripEngine({
       setup,
       state,
       phase,
+      position,
+      walk,
       gpsError: geo.error,
       notifyOn,
       enableNotify,
@@ -241,6 +300,8 @@ function TripEngine({
       setup,
       state,
       phase,
+      position,
+      walk,
       geo.error,
       notifyOn,
       enableNotify,

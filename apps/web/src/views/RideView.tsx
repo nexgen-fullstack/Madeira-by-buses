@@ -14,6 +14,7 @@ import { useGeolocation } from '../lib/geolocation.ts';
 import { decodePlace, encodePlace } from '../lib/itinerary.ts';
 import { expresswayStretches, kilometres } from '../lib/lines.ts';
 import {
+  flagPoint,
   itineraryContent,
   WAY_WIDTH,
   WAY_YELLOW,
@@ -195,14 +196,13 @@ export function RideView({
       const points: MapPoint[] = times.map((x, i) => {
         const st = net.stops[x.stop]!;
         return i === boardPos
-          ? {
-              lat: st.lat,
-              lon: st.lon,
-              kind: 'board',
-              color: '#ffffff',
-              fill: '#14181F',
-              label: st.name,
-            }
+          ? flagPoint(
+              st,
+              false,
+              { mode: 'bus', color: WAY_YELLOW, text: net.routes[p.route]!.short },
+              st.name,
+              { label: st.name },
+            )
           : { lat: st.lat, lon: st.lon, kind: 'stop', color: '#14181F', fill: WAY_YELLOW };
       });
       const coords = net.lane(pattern);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { encodePolyline, haversine, type LatLon, type Trail } from '@madeirabus/engine';
-import { reversedTrail, trailBranches, trailLines, trailRegion } from './trails.ts';
+import { reversedTrail, startsAtEnd, trailBranches, trailLines, trailRegion } from './trails.ts';
 
 const at = (lat: number, lon: number) => ({ start: [lat, lon] }) as unknown as Trail;
 
@@ -74,5 +74,38 @@ describe('the other trails met on the way', () => {
     const detour = trail('detour', [32.7, -16.895], [32.705, -16.89], [32.7, -16.885]);
     const [b] = trailBranches(main, [detour]);
     expect(b).toMatchObject({ rejoins: true, reversed: false });
+    // Mapped the other way, it is still walked the way the levada goes: from the earlier place.
+    const back = trail('back', [32.7, -16.885], [32.705, -16.89], [32.7, -16.895]);
+    const [c] = trailBranches(main, [back]);
+    expect(c).toMatchObject({ rejoins: true, reversed: true });
+    expect(c!.coords[0]!.lon).toBeCloseTo(-16.895, 3);
+  });
+
+  it('run on with the walk: one behind its start comes into it, and turns round with it', () => {
+    // The promenade from the Lido runs on along the levada past its start, as the Passeio
+    // Público Marítimo along the one from Praia Formosa to Câmara de Lobos.
+    const promenade = trail('promenade', [32.7, -16.92], [32.7, -16.9], [32.7, -16.88]);
+    const [b] = trailBranches(main, [promenade]);
+    // Walked east from the start: the promenade is walked east into it, its chequered flag
+    // where the levada starts.
+    expect(b!.reversed).toBe(false);
+    expect(b!.coords[0]!.lon).toBeCloseTo(-16.92, 3);
+    expect(haversine(b!.coords.at(-1)!, { lat: 32.7, lon: -16.9 })).toBeLessThan(30);
+    // Walked west from the end, the promenade goes on west from where the levada ends.
+    const [w] = trailBranches(reversedTrail(main), [promenade]);
+    expect(w!.reversed).toBe(true);
+    expect(haversine(w!.coords[0]!, { lat: 32.7, lon: -16.9 })).toBeLessThan(30);
+    expect(w!.coords.at(-1)!.lon).toBeCloseTo(-16.92, 3);
+  });
+});
+
+describe('which end a trail starts at', () => {
+  const main = trail('main', [32.7, -16.9], [32.7, -16.88]);
+  it('is the end nearer to the phone, where it is known', () => {
+    expect(startsAtEnd(main, undefined)).toBe(false);
+    expect(startsAtEnd(main, { lat: 32.69, lon: -16.905 })).toBe(false);
+    expect(startsAtEnd(main, { lat: 32.69, lon: -16.87 })).toBe(true);
+    // A loop starts where it is mapped to.
+    expect(startsAtEnd({ ...main, roundtrip: true }, { lat: 32.69, lon: -16.87 })).toBe(false);
   });
 });

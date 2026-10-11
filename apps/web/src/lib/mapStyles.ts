@@ -27,7 +27,9 @@ export interface MapLayers {
   transit: boolean;
   /** The hiking trails, dashed in the red of their waymarks, with where each starts. */
   trails: boolean;
-  /** The places with a view by their photos (and, with the trails, the photos along them). */
+  /** With the trails, their photos where each was taken (off: the trails' lines alone). */
+  trailPhotos: boolean;
+  /** The places with a view by their photos (not those of the trails: see `trailPhotos`). */
   scenic: boolean;
 }
 
@@ -38,8 +40,19 @@ export const DEFAULT_LAYERS: MapLayers = {
   terrain3d: false,
   transit: false,
   trails: false,
+  trailPhotos: true,
   scenic: true,
 };
+
+/**
+ * The trails button's three steps in turn: the trails with their photos, the trails alone
+ * (their lines and starts), then none, the bare island.
+ */
+export function nextTrails(layers: MapLayers): MapLayers {
+  if (!layers.trails) return { ...layers, trails: true, trailPhotos: true };
+  if (layers.trailPhotos) return { ...layers, trailPhotos: false };
+  return { ...layers, trails: false, trailPhotos: true };
+}
 
 const VECTOR_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 

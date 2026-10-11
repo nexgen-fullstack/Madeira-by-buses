@@ -1,4 +1,9 @@
-import { haversine, type LatLon, type Trail } from '@madeirabus/engine';
+import {
+  cumulativeDistances,
+  projectOnPolyline,
+  type LatLon,
+  type Trail,
+} from '@madeirabus/engine';
 import type { ScenicSpot } from './mapContent.ts';
 import type { PhotoCredit } from './scenic.ts';
 import { trailLines, trailRegion } from './trails.ts';
@@ -61,16 +66,22 @@ export function photoCredits(): Photo[] {
 /** A photo taken farther than this from its trail (m) is of it from afar: not put on it. */
 const ON_TRAIL = 400;
 
-/** How far a point is from a trail (m), from its points (a few metres apart). */
-function fromTrail(p: LatLon, lines: readonly LatLon[][]): number {
-  let best = Infinity;
-  for (const l of lines) for (const q of l) best = Math.min(best, haversine(p, q));
+/** The spot on a trail nearest to `p`, and how far `p` is from it (m). */
+export function onTrail(p: LatLon, lines: readonly LatLon[][]): { at: LatLon; offset: number } {
+  let best: { at: LatLon; offset: number } = { at: p, offset: Infinity };
+  for (const l of lines) {
+    if (l.length === 0) continue;
+    const hit = projectOnPolyline(l, cumulativeDistances(l), p);
+    if (hit.offset < best.offset) best = { at: hit.point, offset: hit.offset };
+  }
   return best;
 }
 
 /**
- * A trail's photos on the map where each was taken: its own and those of the viewpoints on
- * it, each a tap from the trail's page; none taken far from it.
+ * A trail's photos on the map where the view they show is seen from: on the trail, at its
+ * spot nearest to where each was taken (a camera's place on Wikimedia Commons is often a
+ * house or a road beside the path, a few metres to a few hundred off). Its own and those
+ * of the viewpoints on it, each a tap from the trail's page; none taken far from it.
  */
 export function trailPhotoSpots(trail: Trail): ScenicSpot[] {
   const lines = trailLines(trail);
@@ -82,8 +93,9 @@ export function trailPhotoSpots(trail: Trail): ScenicSpot[] {
   const seen = new Set<string>();
   return photos.flatMap(({ name, photo }) => {
     if (photo.lat === undefined || photo.lon === undefined || seen.has(photo.file)) return [];
-    const at = { lat: photo.lat, lon: photo.lon };
-    if (fromTrail(at, lines) > ON_TRAIL) return [];
+    const near = onTrail({ lat: photo.lat, lon: photo.lon }, lines);
+    if (near.offset > ON_TRAIL) return [];
+    const at = { lat: near.at.lat, lon: near.at.lon };
     seen.add(photo.file);
     return [
       {
@@ -93,6 +105,7 @@ export function trailPhotoSpots(trail: Trail): ScenicSpot[] {
         photo: photoUrl(photo, 'sm'),
         region,
         href: `hikes/${trail.id}`,
+        trail: true,
       },
     ];
   });

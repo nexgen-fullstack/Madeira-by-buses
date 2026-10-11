@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
+  cumulativeDistances,
   decodePolyline,
   encodePolyline,
   GridIndex,
   haversine,
+  pointAlong,
+  projectOnPolyline,
   type LatLon,
   type Network,
   type Trail,
@@ -18,6 +21,8 @@ import type { Region } from './scenic.ts';
  */
 
 let loading: Promise<Trail[]> | undefined;
+/** The trails once read: a screen opened again has them at once (and its list where it was). */
+let loaded: Trail[] | undefined;
 
 /** The trails, or none when the file cannot be read (offline before it was ever loaded). */
 export function loadTrails(): Promise<Trail[]> {
@@ -25,7 +30,8 @@ export function loadTrails(): Promise<Trail[]> {
     try {
       const res = await fetch(`${import.meta.env.BASE_URL}data/trails.json`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return ((await res.json()) as TrailsFile).trails ?? [];
+      loaded = ((await res.json()) as TrailsFile).trails ?? [];
+      return loaded;
     } catch {
       // Asked again next time.
       loading = undefined;
@@ -37,15 +43,15 @@ export function loadTrails(): Promise<Trail[]> {
 
 /** The trails once loaded (undefined until then); `want` false: not yet asked for. */
 export function useTrails(want = true): Trail[] | undefined {
-  const [trails, setTrails] = useState<Trail[] | undefined>();
+  const [trails, setTrails] = useState<Trail[] | undefined>(() => (want ? loaded : undefined));
   useEffect(() => {
-    if (!want) return;
+    if (!want || trails) return;
     let cancelled = false;
     void loadTrails().then((t) => !cancelled && setTrails(t));
     return () => {
       cancelled = true;
     };
-  }, [want]);
+  }, [want, trails]);
   return trails;
 }
 
@@ -166,19 +172,94 @@ export function trailBranches(trail: Trail, trails: readonly Trail[]): TrailBran
         const comesBack = b < line.length - 1;
         const coords = line.slice(leaves ? a - 1 : a, comesBack ? b + 2 : b + 1);
         if (lengthOf(coords) < BRANCH) continue;
-        out.push(
-          leaves
-            ? { trail: other, coords, rejoins: comesBack, reversed: false }
-            : { trail: other, coords: coords.reverse(), rejoins: false, reversed: true },
-        );
+        const branch = leaves
+          ? { trail: other, coords, rejoins: comesBack, reversed: false }
+          : { trail: other, coords: coords.reverse(), rejoins: false, reversed: true };
+        out.push(alongTheWalk(trailLines(trail), branch));
       }
     }
   }
   return out;
 }
 
+/** How far along (m) a branch's way is looked at for the way it heads. */
+const HEADING_AHEAD = 40;
+/** A way turning back more than this (degrees) from the trail's runs against it. */
+const AGAINST = 120;
+
+/** The heading of a step (degrees clockwise from north). */
+function headingOf(a: LatLon, b: LatLon): number {
+  const dx = (b.lon - a.lon) * Math.cos((a.lat * Math.PI) / 180);
+  return ((Math.atan2(dx, b.lat - a.lat) * 180) / Math.PI + 360) % 360;
+}
+
+/**
+ * Where `p` lies on a trail walked from its start: how far along it (m, over its lines in
+ * their order) and which way the trail heads there (degrees).
+ */
+function onTrail(lines: readonly LatLon[][], p: LatLon): { along: number; heading: number } {
+  let best: { along: number; heading: number; offset: number } | undefined;
+  let before = 0;
+  for (const line of lines) {
+    if (line.length < 2) continue;
+    const cum = cumulativeDistances(line);
+    const at = projectOnPolyline(line, cum, p);
+    if (!best || at.offset < best.offset) {
+      // Over a stretch of it, not its step there (a few metres one way at its very end).
+      const total = cum.at(-1)!;
+      const from = Math.max(0, Math.min(at.along, total - HEADING_AHEAD));
+      best = {
+        along: before + at.along,
+        heading: headingOf(
+          pointAlong(line, cum, from),
+          pointAlong(line, cum, from + HEADING_AHEAD),
+        ),
+        offset: at.offset,
+      };
+    }
+    before += cum.at(-1)!;
+  }
+  return best ?? { along: 0, heading: 0 };
+}
+
+/**
+ * A branch the way the trail is walked: one that leaves it heading back against the walk
+ * (or comes back onto it before where it left) is walked the other way, into the trail,
+ * so that its arrows run on with the trail's and its chequered flag stands where it meets
+ * it. Walked from the trail's end, the trails off it turn round with it.
+ */
+export function alongTheWalk(lines: readonly LatLon[][], branch: TrailBranch): TrailBranch {
+  const { coords } = branch;
+  const first = coords[0]!;
+  let against: boolean;
+  if (branch.rejoins) {
+    against = onTrail(lines, coords.at(-1)!).along < onTrail(lines, first).along;
+  } else {
+    let k = 1;
+    let gone = 0;
+    while (k < coords.length - 1 && gone < HEADING_AHEAD)
+      gone += haversine(coords[k - 1]!, coords[k++]!);
+    const turn = Math.abs(
+      ((headingOf(first, coords[k - 1] ?? coords.at(-1)!) - onTrail(lines, first).heading + 540) %
+        360) -
+        180,
+    );
+    against = turn > AGAINST;
+  }
+  if (!against) return branch;
+  return { ...branch, coords: [...coords].reverse(), reversed: !branch.reversed };
+}
+
 export const startOf = (t: Trail): LatLon => ({ lat: t.start[0], lon: t.start[1] });
 export const endOf = (t: Trail): LatLon => ({ lat: t.end[0], lon: t.end[1] });
+
+/**
+ * Whether a trail is best walked from its end by someone at `here`: its end is the nearer
+ * of the two. The trails are mapped without a way to walk them (OpenStreetMap marks none
+ * one-way), so either end is a start; a loop starts where it is mapped to.
+ */
+export const startsAtEnd = (t: Trail, here: LatLon | undefined): boolean =>
+  Boolean(here) && !t.roundtrip && haversine(here!, endOf(t)) < haversine(here!, startOf(t));
 
 /**
  * Where on the island a trail starts, as the places with a view are listed: the west
