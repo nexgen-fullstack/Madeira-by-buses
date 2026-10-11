@@ -32,6 +32,7 @@ import {
   endOf,
   JUNCTION,
   linesAt,
+  nearbyTrails,
   nearestStop,
   reversedTrail,
   startOf,
@@ -165,6 +166,22 @@ function Hike({
   const all = useTrails();
   const branches = useMemo(() => (all ? trailBranches(trail, all) : []), [trail, all]);
   const colors = useMemo(() => branchColors(branches), [branches]);
+  // The trails near it, the only others on the map with it: those met, those half an hour
+  // away on foot or by bus.
+  const nearby = useMemo(
+    () =>
+      all
+        ? [
+            ...nearbyTrails(
+              trail,
+              all,
+              net,
+              branches.map((b) => b.trail.id),
+            ),
+          ]
+        : undefined,
+    [trail, all, net, branches],
+  );
   // The other trails added to the walk (a tap on one), kept in the address with the way.
   const keys = useMemo(() => branchKeys(branches), [branches]);
   const added = useMemo(() => new Set((add ?? '').split(',').filter(Boolean)), [add]);
@@ -187,15 +204,12 @@ function Hike({
     const b = branches[keys.indexOf(key)];
     if (!b) return undefined;
     const title = nameOf(b);
-    if (held) {
-      if (!added.has(key)) return { title, lines: [t.t('hike.tapToAdd')] };
-      const next = new Set(added);
-      next.delete(key);
-      setAdded(next);
-      return undefined;
-    }
-    if (added.has(key)) return { title, lines: [t.t('hike.holdToRemove')] };
-    setAdded(new Set([...added, key]));
+    // A tap adds it, another takes it off again (as a finger held on it does).
+    const next = new Set(added);
+    if (added.has(key)) next.delete(key);
+    else if (held) return { title, lines: [t.t('hike.tapToAdd')] };
+    else next.add(key);
+    setAdded(next);
     return undefined;
   };
 
@@ -219,20 +233,26 @@ function Hike({
       });
       return {
         lines: [
-          // Added to the walk: as wide as the trail; the others thinner, a tap adds them.
-          ...branches.map((b, i) => ({
-            coords: b.coords,
-            color: colors.get(b.trail.id)!,
-            width: added.has(keys[i]!) ? 6 : 3.5,
-            arrows: true,
-            key: keys[i]!,
-          })),
+          // Added to the walk: as wide as the trail, with its arrows; the others pale, not
+          // part of the way until a tap adds them.
+          ...branches.map((b, i) => {
+            const on = added.has(keys[i]!);
+            return {
+              coords: b.coords,
+              color: colors.get(b.trail.id)!,
+              width: on ? 6 : 4,
+              arrows: on,
+              ...(on ? {} : { faint: true }),
+              key: keys[i]!,
+            };
+          }),
           ...lines.map((coords) => ({ coords, color: TRAIL_RED, width: 6, arrows: true })),
         ],
         points: [
+          // Flags for the trail and those added to it: the others are not part of the way.
           ...trailFlags(
             { start, end, name: trail.name },
-            branches.map((b) => ({
+            addedBranches.map((b) => ({
               coords: b.coords,
               color: colors.get(b.trail.id)!,
               name: nameOf(b),
@@ -246,9 +266,11 @@ function Hike({
         fit: lines.flat(),
         focus: `hike:${trail.id}`,
         onLine,
+        // Of the other trails, only those near it.
+        ...(nearby ? { trailIds: nearby } : {}),
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [trail, net, branches, colors, keys, added]),
+    }, [trail, net, branches, colors, keys, added, nearby]),
   );
   // Each other trail met, once, as listed under the trail: walked the way it turns off.
   const met = [...colors].map(([id, color]) => {

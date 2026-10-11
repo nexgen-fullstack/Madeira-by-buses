@@ -18,6 +18,9 @@ test('a scenic place plans the trip and shows every bus of the day', async ({ pa
   await expect(card).toContainText('Долина черниць');
   await expect(card.locator('.route-badge')).toHaveText('D81');
   await card.click();
+  // The place chosen: the sheet down, the way there on the whole map; pulled up, the rest.
+  await expect(page.locator('.panel--min')).toHaveCount(1);
+  await raiseSheet(page);
 
   await expect(page.getByRole('heading', { name: 'Curral das Freiras' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Фото: Diego Delso, CC BY-SA 4.0' })).toHaveAttribute(
@@ -52,6 +55,7 @@ test('a place’s trip starts where you are, or at an address or a point chosen'
   await context.grantPermissions(['geolocation']);
   await context.setGeolocation({ latitude: 32.6487, longitude: -16.9036 });
   await page.goto('./#/explore/curral');
+  await raiseSheet(page);
   const from = page.locator('.destination .plan__from input');
   await expect(from).toHaveValue('Моє місцезнаходження');
   await expect(page.locator('.it-card').first()).toContainText('D81');
@@ -109,6 +113,7 @@ test('the island opens with its places with a view by their photos; a tap opens 
   const monte = page.locator('.scenic-pin[aria-label="Monte"]');
   await expect(monte.locator('.scenic-pin__photo')).toHaveCSS('background-image', /monte-sm\.webp/);
   await monte.click({ force: true });
+  await raiseSheet(page);
   await expect(page.getByRole('heading', { name: 'Monte' })).toBeVisible();
   // A place page shows its trip on the map, not the photos.
   await expect(page.locator('.scenic-pin')).toHaveCount(0);
@@ -119,6 +124,7 @@ test('the planner’s start screen suggests places with a view', async ({ page }
   await raiseSheet(page);
   await expect(page.getByRole('heading', { name: 'Гарні краєвиди' })).toBeVisible();
   await page.locator('.scenic-strip').getByRole('link', { name: /Monte/ }).click();
+  await raiseSheet(page);
   await expect(page.getByRole('heading', { name: 'Monte' })).toBeVisible();
 });
 
@@ -147,6 +153,7 @@ test('a place: Start on its photo, its lines by their numbers, back to the same 
   const panel = page.locator('.panel');
   await panel.evaluate((el) => el.scrollTo({ top: 600 }));
   await page.getByRole('link', { name: /Curral das Freiras/ }).click();
+  await raiseSheet(page);
   await expect(page.getByRole('heading', { name: 'Curral das Freiras' })).toBeVisible();
   // The photo's credit is at the end of the page, not on it; on it, a small "Start".
   await expect(page.locator('.destination__hero .destination__credit')).toHaveCount(0);
@@ -155,6 +162,7 @@ test('a place: Start on its photo, its lines by their numbers, back to the same 
   await expect(page).toHaveURL(/explore\/curral\?i=0/);
   await expect(page.locator('.panel--min')).toHaveCount(1);
   await page.goBack();
+  await raiseSheet(page);
 
   // A line's number in the day's timetable opens the line from where it is boarded.
   await page.locator('.day-trips__line').first().click();
@@ -164,6 +172,7 @@ test('a place: Start on its photo, its lines by their numbers, back to the same 
   await expect(page).toHaveURL(/#\/explore\/curral/);
 
   // Back to the list where it was left.
+  await raiseSheet(page);
   await page.locator('.destination__back').click();
   await expect(page).toHaveURL(/#\/explore$/);
   await expect.poll(() => panel.evaluate((el) => el.scrollTop)).toBeGreaterThan(400);

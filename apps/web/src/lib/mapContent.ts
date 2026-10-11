@@ -29,6 +29,8 @@ export interface MapLine {
   href?: string;
   /** A walk with a view (along the sea): on a wider band. */
   view?: boolean;
+  /** Pale: shown, but not part of the way (another trail met, not added to the walk). */
+  faint?: boolean;
   /** Told to `MapContent.onLine` when tapped or held (a trail added to a walk, or not yet). */
   key?: string;
 }
@@ -105,6 +107,11 @@ export interface MapContent {
    * and a word to show, if any.
    */
   onLine?: (key: string, held: boolean) => LineNote | undefined;
+  /**
+   * Of the hiking trails layer, only these (a trail's page: those near it; the trails tab:
+   * those its filters keep); all when not given.
+   */
+  trailIds?: readonly string[];
   /** Where the buses shown run on the Via Rápida: a violet band under them, named. */
   expressways?: LatLon[][];
 }

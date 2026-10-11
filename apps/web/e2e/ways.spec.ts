@@ -64,6 +64,9 @@ test('the hiking trails: by kind and region, each with its buses, on the map', a
   // The walk to the tip of the island: its facts, the bus at its start, back the same way.
   await page.locator('.trail-card', { hasText: 'Ponta de São Lourenço' }).click();
   await expect(page).toHaveURL(/#\/hikes\/pr8$/);
+  // The sheet down, the whole trail on the map; pulled up, its page.
+  await expect(page.locator('.panel--min')).toHaveCount(1);
+  await raiseSheet(page);
   await expect(page.locator('.hike__facts')).toContainText('Довжина');
   await expect(page.locator('.hike-stop').first()).toContainText('Початок');
   await expect(page.locator('.hike__back')).toContainText('назад тим самим шляхом');

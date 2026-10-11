@@ -543,9 +543,8 @@ export const pl: Dict = {
   'hike.reverseLoop': 'Przejdź w drugą stronę',
   'hike.branches': 'Odbijające szlaki',
   'hike.branchesNote':
-    'Dotknięcie szlaku na mapie lub tutaj dodaje go do wędrówki; przytrzymanie na mapie go usuwa.',
+    'Blade szlaki obok nie należą do wędrówki. Dotknięcie na mapie lub tutaj dodaje szlak, kolejne go usuwa.',
   'hike.tapToAdd': 'Dotknij, aby dodać do wędrówki',
-  'hike.holdToRemove': 'Dodano do wędrówki. Przytrzymaj, aby usunąć',
   'hike.startFrom': 'Zacznij od:',
   'hike.withAdded': 'Razem z dodanymi: {km} km · ≈ {time}',
   'hike.open': 'Otwórz szlak „{name}”',

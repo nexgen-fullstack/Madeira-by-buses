@@ -540,9 +540,8 @@ export const cs: Dict = {
   'hike.reverseLoop': 'Projít opačným směrem',
   'hike.branches': 'Odbočující stezky',
   'hike.branchesNote':
-    'Klepnutí na stezku na mapě nebo zde ji přidá k procházce, dlouhé podržení na mapě ji odebere.',
+    'Bledé stezky poblíž nejsou součástí procházky. Klepnutí na mapě nebo zde stezku přidá, další klepnutí ji odebere.',
   'hike.tapToAdd': 'Klepněte pro přidání k procházce',
-  'hike.holdToRemove': 'Přidáno k procházce. Podržte pro odebrání',
   'hike.startFrom': 'Začít od:',
   'hike.withAdded': 'S přidanými: {km} km · ≈ {time}',
   'hike.open': 'Otevřít stezku „{name}“',

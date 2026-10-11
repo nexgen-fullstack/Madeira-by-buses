@@ -511,9 +511,8 @@ export const pt: Dict = {
   'hike.reverseLoop': 'Fazer no sentido contrário',
   'hike.branches': 'Trilhos que se cruzam',
   'hike.branchesNote':
-    'Um toque num percurso no mapa ou aqui junta-o à caminhada; manter o dedo no mapa retira-o.',
+    'Os percursos pálidos ao lado não fazem parte da caminhada. Um toque no mapa ou aqui junta um; outro toque retira-o.',
   'hike.tapToAdd': 'Toque para juntar à caminhada',
-  'hike.holdToRemove': 'Junto à caminhada. Mantenha premido para retirar',
   'hike.startFrom': 'Começar em:',
   'hike.withAdded': 'Com os juntados: {km} km · ≈ {time}',
   'hike.open': 'Abrir o percurso «{name}»',

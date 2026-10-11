@@ -510,9 +510,8 @@ export const it: Dict = {
   'hike.reverseLoop': 'Percorrerlo nell’altro senso',
   'hike.branches': 'Sentieri che si diramano',
   'hike.branchesNote':
-    'Toccare un sentiero sulla mappa o qui lo aggiunge alla camminata; una pressione lunga sulla mappa lo toglie.',
+    'I sentieri pallidi vicini non fanno parte della camminata. Un tocco sulla mappa o qui ne aggiunge uno, un altro lo toglie.',
   'hike.tapToAdd': 'Tocca per aggiungerlo alla camminata',
-  'hike.holdToRemove': 'Aggiunto alla camminata. Tieni premuto per toglierlo',
   'hike.startFrom': 'Parti da:',
   'hike.withAdded': 'Con gli aggiunti: {km} km · ≈ {time}',
   'hike.open': 'Apri il sentiero «{name}»',

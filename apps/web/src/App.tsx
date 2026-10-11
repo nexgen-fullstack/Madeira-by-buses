@@ -133,11 +133,12 @@ function sheetRest(route: Route): SheetSnap {
   if (head === 'trip' || route.query.has('i')) return 'min';
   if (head === 'plan') return route.query.has('to') ? 'half' : 'peek';
   if (head === 'settings') return 'full';
-  // A place: its photo, name and "start" over the map, the way there on the map above them;
-  // the rest when the sheet is pulled up. Its "from" or "to" changed: the ways there in view.
+  // A place or a trail chosen: the sheet down, the whole way on the map from its start to its
+  // end; the rest when the sheet is pulled up. A place's "from" or "to" changed: the ways there.
   if (head === 'explore' && route.path[1]) {
-    return route.query.has('from') || route.query.has('to') ? 'half' : 'peek';
+    return route.query.has('from') || route.query.has('to') ? 'half' : 'min';
   }
+  if (head === 'hikes' && route.path[1]) return 'min';
   return 'half';
 }
 
@@ -232,6 +233,14 @@ function Shell() {
     head === 'plan' && [...route.query.keys()].length === 0 ? 'min' : rest,
     peek,
   );
+  // The map's "where am I" button: the sheet down, the map on the phone's place.
+  const setSnap = sheet.setSnap;
+  useEffect(() => {
+    if (!sheetMode) return;
+    const down = () => setSnap('min');
+    window.addEventListener('mb-sheet-down', down);
+    return () => window.removeEventListener('mb-sheet-down', down);
+  }, [sheetMode, setSnap]);
   // The map keeps the route clear of the sheet once it rests.
   const inset = sheetMode ? snapInset(sheet.snap, sheet.areaHeight, peek) : 0;
   useEffect(() => {

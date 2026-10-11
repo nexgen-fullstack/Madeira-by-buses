@@ -509,9 +509,8 @@ export const es: Dict = {
   'hike.reverseLoop': 'Recorrerla en sentido contrario',
   'hike.branches': 'Senderos que se cruzan',
   'hike.branchesNote':
-    'Un toque en un sendero en el mapa o aquí lo añade a la caminata; mantener pulsado en el mapa lo quita.',
+    'Los senderos pálidos cercanos no forman parte de la caminata. Un toque en el mapa o aquí añade uno; otro toque lo quita.',
   'hike.tapToAdd': 'Toque para añadirlo a la caminata',
-  'hike.holdToRemove': 'Añadido a la caminata. Mantenga pulsado para quitarlo',
   'hike.startFrom': 'Empezar en:',
   'hike.withAdded': 'Con los añadidos: {km} km · ≈ {time}',
   'hike.open': 'Abrir el sendero «{name}»',

@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bus, Clock, MoveHorizontal, Repeat, TrendingUp } from 'lucide-react';
-import { trailMinutes, type Trail, type TrailKind } from '@madeirabus/engine';
+import { haversine, trailMinutes, type Trail, type TrailKind } from '@madeirabus/engine';
 import { useMapContent } from '../components/mapContext.tsx';
 import { useI18n, type Key } from '../i18n.ts';
 import { duration } from '../lib/format.ts';
+import { useQuietPosition } from '../lib/geolocation.ts';
 import { EMPTY_CONTENT, ISLAND, type MapContent } from '../lib/mapContent.ts';
 import { photoUrl, trailPhoto } from '../lib/photos.ts';
 import { navigate } from '../lib/router.ts';
-import { REGIONS, regionKey } from '../lib/scenic.ts';
+import { REGIONS } from '../lib/scenic.ts';
 import { nearestStop, startOf, TRAIL_KINDS, trailRegion, useTrails } from '../lib/trails.ts';
 import { useApp, useNetwork } from '../state/app.tsx';
 
@@ -119,9 +120,6 @@ export function HikesView() {
   const setBusOnly = (f: (b: boolean) => boolean) =>
     setBusOnlyState((b) => (shownFilters.busOnly = f(b)));
 
-  useMapContent(
-    useMemo<MapContent>(() => ({ ...EMPTY_CONTENT, fitKey: 'island', fit: ISLAND }), []),
-  );
   useTrailsWhileOpen();
 
   // How far each trail's start is from a bus stop (m), where one is near.
@@ -129,8 +127,32 @@ export function HikesView() {
     () => new Map((trails ?? []).map((tr) => [tr.id, nearestStop(net, startOf(tr))?.metres])),
     [trails, net],
   );
-  const shown = (trails ?? []).filter(
-    (tr) => (kind === 'all' || tr.kind === kind) && (!busOnly || bus.get(tr.id) !== undefined),
+  // One list, the nearest to the phone first (where it is known), else by region.
+  const here = useQuietPosition();
+  const shown = useMemo(() => {
+    const list = (trails ?? []).filter(
+      (tr) => (kind === 'all' || tr.kind === kind) && (!busOnly || bus.get(tr.id) !== undefined),
+    );
+    const order = (tr: Trail) =>
+      here ? haversine(here, startOf(tr)) : REGIONS.indexOf(trailRegion(tr));
+    return list
+      .map((tr) => [order(tr), tr] as const)
+      .sort((a, b) => a[0] - b[0])
+      .map(([, tr]) => tr);
+  }, [trails, kind, busOnly, bus, here]);
+  // On the map, the trails the filters keep, as in the list.
+  const filtered = kind !== 'all' || busOnly;
+  const ids = useMemo(() => shown.map((tr) => tr.id).join(','), [shown]);
+  useMapContent(
+    useMemo<MapContent>(
+      () => ({
+        ...EMPTY_CONTENT,
+        fitKey: 'island',
+        fit: ISLAND,
+        ...(filtered ? { trailIds: ids ? ids.split(',') : [] } : {}),
+      }),
+      [filtered, ids],
+    ),
   );
   const kinds = TRAIL_KINDS.filter((k) => trails?.some((tr) => tr.kind === k));
 
@@ -161,20 +183,13 @@ export function HikesView() {
       </div>
       {!trails && <p className="muted">{t.t('loading')}</p>}
       {trails && shown.length === 0 && <p className="muted">{t.t('hikes.none')}</p>}
-      {REGIONS.map((region) => {
-        const list = shown.filter((tr) => trailRegion(tr) === region);
-        if (list.length === 0) return null;
-        return (
-          <section key={region}>
-            <h3 className="plan__subtitle">{t.t(regionKey(region))}</h3>
-            <div className="trail-list">
-              {list.map((tr) => (
-                <TrailCard key={tr.id} trail={tr} bus={bus.get(tr.id)} />
-              ))}
-            </div>
-          </section>
-        );
-      })}
+      {shown.length > 0 && (
+        <div className="trail-list">
+          {shown.map((tr) => (
+            <TrailCard key={tr.id} trail={tr} bus={bus.get(tr.id)} />
+          ))}
+        </div>
+      )}
       <p className="muted small">{t.t('hike.timeNote')}</p>
     </div>
   );

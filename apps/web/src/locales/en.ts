@@ -508,9 +508,8 @@ export const en: Dict = {
   'hike.reverseLoop': 'Walk it the other way',
   'hike.branches': 'Trails branching off',
   'hike.branchesNote':
-    'A tap on a trail on the map or here adds it to the walk; a finger held on the map takes it off.',
+    'The pale trails nearby are not part of the walk. A tap on the map or here adds one; another tap takes it off.',
   'hike.tapToAdd': 'Tap to add it to the walk',
-  'hike.holdToRemove': 'Added to the walk. Hold to take it off',
   'hike.startFrom': 'Start from:',
   'hike.withAdded': 'With those added: {km} km · ≈ {time}',
   'hike.open': 'Open the trail “{name}”',

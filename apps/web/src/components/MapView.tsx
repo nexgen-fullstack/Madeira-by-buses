@@ -198,6 +198,7 @@ function toGeoJson(content: MapContent) {
           view: l.view ?? l.color === VIEW_WALK,
           walkDot: walkDotId(l.color),
           key: l.key ?? '',
+          faint: Boolean(l.faint),
         },
         geometry: { type: 'LineString' as const, coordinates: l.coords.map((c) => [c.lon, c.lat]) },
       })),
@@ -728,7 +729,7 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
     source: 'mb-trail-heads',
     layout: { visibility: 'none' },
     // Far out only the official PR trails' starts.
-    filter: ['any', ['get', 'pr'], ['>=', ['zoom'], 11.5]],
+    filter: HEADS_FILTER,
     paint: {
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3.5, 13, 6],
       'circle-color': TRAIL_RED,
@@ -761,7 +762,7 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
       'line-color': ['get', 'casing'],
       // The edge in proportion to the line: half its width again.
       'line-width': ['*', ['get', 'width'], 1.5],
-      'line-opacity': 0.9,
+      'line-opacity': ['case', ['get', 'faint'], 0.35, 0.9],
       'line-offset': sideOffset,
     },
   });
@@ -774,6 +775,7 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
     paint: {
       'line-color': ['get', 'color'],
       'line-width': ['get', 'width'],
+      'line-opacity': ['case', ['get', 'faint'], 0.5, 1],
       'line-offset': sideOffset,
     },
   });
@@ -1183,15 +1185,29 @@ async function trailGeoJson(): Promise<TrailData> {
   };
 }
 
-/** Puts the hiking trails on the map, or hides them. */
-function applyTrails(map: MapLibreMap, data: TrailData | undefined, on: boolean) {
+/** Where the trails start, far out only the official PR trails'. */
+const HEADS_FILTER: ExpressionSpecification = ['any', ['get', 'pr'], ['>=', ['zoom'], 11.5]];
+
+/** Puts the hiking trails on the map, or hides them; `only`: just these. */
+function applyTrails(
+  map: MapLibreMap,
+  data: TrailData | undefined,
+  on: boolean,
+  only?: readonly string[],
+) {
   if (!map.getSource('mb-trails')) return;
   if (data) {
     (map.getSource('mb-trails') as GeoJSONSource).setData(data.lines);
     (map.getSource('mb-trail-heads') as GeoJSONSource).setData(data.heads);
   }
+  const mine: ExpressionSpecification | undefined = only
+    ? ['in', ['get', 'id'], ['literal', [...only]]]
+    : undefined;
   for (const id of TRAIL_LAYERS) {
-    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+    if (!map.getLayer(id)) continue;
+    map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+    const base = id === 'mb-trail-head' ? HEADS_FILTER : undefined;
+    map.setFilter(id, mine && base ? ['all', mine, base] : (mine ?? base ?? null));
   }
 }
 /** How wide a line is to a finger (px): easy to tap on a phone. */
@@ -1293,8 +1309,11 @@ export default function MapView({ className }: { className?: string }) {
   );
   const transitRef = useRef<{ data?: TransitData; on: boolean }>({ on: false });
   // The hiking trails: on by the button or layers (and while the trails tab is open).
-  const trailsRef = useRef<{ data?: TrailData; on: boolean }>({ on: false });
+  const trailsRef = useRef<{ data?: TrailData; on: boolean; only?: readonly string[] }>({
+    on: false,
+  });
   const trailsOn = layers.trails;
+  const trailIds = content.trailIds;
   const [trailData, setTrailData] = useState<TrailData | undefined>();
   useEffect(() => {
     if (!trailsOn || trailData) return;
@@ -1305,10 +1324,10 @@ export default function MapView({ className }: { className?: string }) {
     };
   }, [trailsOn, trailData]);
   useEffect(() => {
-    trailsRef.current = { data: trailData, on: trailsOn };
+    trailsRef.current = { data: trailData, on: trailsOn, only: trailIds };
     const map = mapRef.current;
-    if (map && ready) applyTrails(map, trailData, trailsOn);
-  }, [trailData, trailsOn, ready]);
+    if (map && ready) applyTrails(map, trailData, trailsOn, trailIds);
+  }, [trailData, trailsOn, trailIds, ready]);
   // A chosen route is shown alone: every stop and line step aside until asked for again.
   const [transitWith, setTransitWith] = useState<string | undefined>();
   const transitOn = layers.transit && (!content.focus || transitWith === content.focus);
@@ -1353,6 +1372,8 @@ export default function MapView({ className }: { className?: string }) {
         timestamp: p.timestamp,
       }),
     );
+    // Its button pressed: the sheet over the map goes down, the place in full view.
+    locate.on('trackuserlocationstart', () => window.dispatchEvent(new Event('mb-sheet-down')));
     map.addControl(locate, 'top-right');
     map.addControl(new ScaleControl({ maxWidth: 90 }), 'bottom-right');
     const foldCredits = foldAttribution(map);
@@ -1363,7 +1384,7 @@ export default function MapView({ className }: { className?: string }) {
       addOverlay(map, layersRef.current.base);
       applyDetails(map, layersRef.current);
       applyTransit(map, transitRef.current.data, transitRef.current.on);
-      applyTrails(map, trailsRef.current.data, trailsRef.current.on);
+      applyTrails(map, trailsRef.current.data, trailsRef.current.on, trailsRef.current.only);
       fitted.current = {};
       setReady(true);
       apply(map, contentRef.current, fitted);
@@ -1620,7 +1641,10 @@ export default function MapView({ className }: { className?: string }) {
         .filter((s) => (s.trail ? trailPhotosOn : layers.scenic))
         .map((s) => (trailsOn && !hikeChosen ? quiet(s) : s)),
       ...(trailsOn && trailPhotosOn && allTrails
-        ? allTrails.flatMap(trailPhotoSpots).map(quiet)
+        ? allTrails
+            .filter((tr) => !trailIds || trailIds.includes(tr.id))
+            .flatMap(trailPhotoSpots)
+            .map(quiet)
         : []),
     ];
     if (spots.length === 0) return undefined;
@@ -1628,7 +1652,7 @@ export default function MapView({ className }: { className?: string }) {
     const byId = new Map<string, ScenicSpot>();
     for (const s of spots) if (!byId.has(s.id)) byId.set(s.id, s);
     return [...byId.values()];
-  }, [layers.scenic, content.scenic, trailsOn, trailPhotosOn, hikeChosen, allTrails]);
+  }, [layers.scenic, content.scenic, trailsOn, trailPhotosOn, hikeChosen, allTrails, trailIds]);
   useScenicMarkers(mapRef, ready, pick ? undefined : photoSpots);
   // A run or a line tapped belongs to the map shown; another one, forget it.
   useEffect(() => {
