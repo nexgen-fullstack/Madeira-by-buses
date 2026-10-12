@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   AlarmClock,
   AlertTriangle,
+  Bus,
   CalendarClock,
   ArrowLeft,
   Clock,
@@ -18,7 +19,7 @@ import {
   Waves,
   Zap,
 } from 'lucide-react';
-import { adviseTicket, type Itinerary } from '@madeirabus/engine';
+import { adviseTicket, madeiraNow, type Itinerary } from '@madeirabus/engine';
 import { useI18n, type Key } from '../i18n.ts';
 import { isNative, remind } from '../lib/device.ts';
 import { clock, dayAhead, dayMonth, duration, longDate, price } from '../lib/format.ts';
@@ -29,7 +30,8 @@ import { canSimulate } from '../lib/simulator.ts';
 import { useNow } from '../lib/useNow.ts';
 import { planOptions, useApp, useNetwork } from '../state/app.tsx';
 import { LineSheetBlock } from './LineSheetBlock.tsx';
-import { useSpotlight } from './mapContext.tsx';
+import { useMapBuses, useSpotlight } from './mapContext.tsx';
+import { busesNow, liveBuses } from '../lib/liveBus.ts';
 import { RideTimetable } from './RideTimetable.tsx';
 import { RouteBadge } from './RouteBadge.tsx';
 import { routeColor } from '../lib/color.ts';
@@ -61,6 +63,33 @@ export function ItineraryDetail({ it, date, ahead, onFocusLeg, onBack, onStart, 
 
   const firstLeg = it.legs[0]!;
   const lastLeg = it.legs[it.legs.length - 1]!;
+
+  // The buses of this way where their timetable has them now, moving on the map, and how far
+  // the first one is from where it is boarded: whether there is time to get there.
+  const clockNow = useNow(5_000);
+  const buses = useMemo(
+    () => busesNow(net, it, date, madeiraNow().date, clockNow.time),
+    [net, it, date, clockNow],
+  );
+  useMapBuses(useMemo(() => liveBuses(net, buses), [net, buses]));
+  const firstBus = buses.find((b) => b.index === 0);
+  const liveText = (() => {
+    const leg = firstBus?.leg;
+    if (!firstBus || !leg) return undefined;
+    const route = net.routes[leg.route]!.short;
+    if (firstBus.waiting)
+      return t.t('live.terminus', {
+        route,
+        stop: net.stops[net.patterns[leg.pattern]!.stops[0]!]!.name,
+        t: clock(net.tripStops(leg.pattern, date, leg.dayTrip)[0]!.dep),
+      });
+    const away = leg.boardPos - firstBus.pos;
+    if (away > 0) return t.tn('live.coming', away, { route, t: clock(leg.start) });
+    if (away === 0 && clockNow.time <= leg.start) return t.t('live.here', { route });
+    return t.t('live.gone', { route });
+  })();
+  // On foot to the first bus: when to leave to catch it.
+  const leaveBy = firstLeg.kind === 'walk' && firstBus && !firstBus.waiting ? it.depart : undefined;
 
   useEffect(() => {
     if (it.rides === 0) return;
@@ -159,6 +188,23 @@ export function ItineraryDetail({ it, date, ahead, onFocusLeg, onBack, onStart, 
           </div>
         </div>
       </div>
+
+      {liveText && (
+        <div className="live-bus" role="status">
+          <Bus size={16} aria-hidden />
+          <div>
+            <div>{liveText}</div>
+            {leaveBy !== undefined && (
+              <div className={leaveBy < clockNow.time ? 'live-bus__late' : 'live-bus__leave'}>
+                {leaveBy < clockNow.time
+                  ? t.t('live.late', { t: clock(leaveBy) })
+                  : t.t('live.leave', { t: clock(leaveBy) })}
+              </div>
+            )}
+            <div className="muted small">{t.t('live.note')}</div>
+          </div>
+        </div>
+      )}
 
       <ol className="timeline">
         {firstLeg.kind === 'walk' && (

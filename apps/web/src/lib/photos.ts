@@ -53,6 +53,22 @@ export const trailPhoto = (id: string): Photo | undefined => PHOTOS.trails[id];
 /** The places with a view on a trail, along it. */
 export const trailViews = (id: string): TrailView[] => PHOTOS.views[id] ?? [];
 
+/**
+ * Every photo with the place it shows and where that is: a walk's where it goes, a trail's
+ * and a viewpoint's where it was taken (or the viewpoint itself).
+ */
+export function placedPhotos(): { name: string; lat: number; lon: number; photo: Photo }[] {
+  const at = (p: Photo, name: string, lat?: number, lon?: number) =>
+    lat !== undefined && lon !== undefined ? [{ name, lat, lon, photo: p }] : [];
+  return [
+    ...Object.entries(PHOTOS.walks).flatMap(([name, p]) => at(p, name, p.lat, p.lon)),
+    ...Object.values(PHOTOS.views).flatMap((list) =>
+      list.flatMap((v) => (v.photo ? at(v.photo, v.name, v.lat, v.lon) : [])),
+    ),
+    ...Object.values(PHOTOS.trails).flatMap((p) => at(p, p.title, p.lat, p.lon)),
+  ];
+}
+
 /** Every photo of the walks, trails and viewpoints, once each, for the list of credits. */
 export function photoCredits(): Photo[] {
   const all = [

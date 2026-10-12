@@ -515,4 +515,34 @@ export const it: Dict = {
   'hike.startFrom': 'Parti da:',
   'hike.withAdded': 'Con gli aggiunti: {km} km · ≈ {time}',
   'hike.open': 'Apri il sentiero «{name}»',
+  'live.coming': {
+    one: 'Bus {route} secondo l’orario: a {n} fermata dalla sua, arriva alle {t}',
+    other: 'Bus {route} secondo l’orario: a {n} fermate dalla sua, arriva alle {t}',
+  },
+  'live.terminus': 'Il bus {route} è ancora al capolinea ({stop}), parte alle {t}',
+  'live.here': 'Secondo l’orario, il bus {route} è ora alla sua fermata',
+  'live.gone': 'Secondo l’orario, il bus {route} è già passato dalla sua fermata',
+  'live.leave': 'Fa in tempo: esca entro le {t}',
+  'live.late': 'Potrebbe non fare in tempo: bisognava uscire alle {t}',
+  'live.note': 'La posizione del bus viene dall’orario, non dal suo GPS',
+  'place.photo': 'Apri la foto: {name}',
+  'scenic.strollHere': 'Passeggiate da qui',
+  'hike.merged': 'Percorso unito',
+  'hike.mergedNote':
+    'Un solo percorso: {names}. Lunghezza, tempo, quote, partenza e arrivo sono di tutto il cammino.',
+  'hike.unmerge': 'Separa',
+  'hike.mergeAsk': 'Unire i percorsi?',
+  'hike.mergeMore': 'Aggiungerlo al percorso unito?',
+  'hike.mergeText':
+    '«{name}» e «{trail}» diventano un solo percorso: lunghezza, tempo, quote, senso e bus valgono per tutto il cammino.',
+  'hike.mergeYes': 'Unisci i percorsi',
+  'hike.mergeNo': 'Mostra soltanto',
+  'places.title': 'Luoghi',
+  'places.website': 'Sito',
+  'scenic.faja-dos-padres.tag': 'Funivia fino alla riva',
+  'scenic.faja-dos-padres.text':
+    'La cabina scende lungo una scogliera quasi a picco fino a una striscia di terra sul mare con banani, manghi e vigne; sotto, un ristorante e una spiaggia di ciottoli. A 10 minuti a piedi dai bus sulla strada a Quinta Grande.',
+  'scenic.penha-de-aguia.tag': 'La Rocca dell’Aquila sopra Faial',
+  'scenic.penha-de-aguia.text':
+    'Un’enorme rupe di 590 m sul mare e, ai suoi piedi, il paese di Faial con la chiesa e i terrazzamenti. La vista migliore è dalla strada sopra il paese, vicino alla fermata.',
 };

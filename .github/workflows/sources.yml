@@ -45,7 +45,7 @@ jobs:
           # A busy Overpass (504 on every server) stops the fetch part way: the previous bus
           # routes, stops and places stay rather than none (on 2026-10-07 the places went so,
           # and with them the airport, the museums and the beaches from the search).
-          for f in bus-routes.json bus-stops.json places.json; do
+          for f in bus-routes.json bus-stops.json places.json pois.json; do
             if [ ! -f "data/sources/osm/$f" ]; then
               echo "::warning title=$f not refreshed::Not from Overpass; keeping the previous one."
               git checkout HEAD -- "data/sources/osm/$f" || true

@@ -545,4 +545,36 @@ export const cs: Dict = {
   'hike.startFrom': 'Začít od:',
   'hike.withAdded': 'S přidanými: {km} km · ≈ {time}',
   'hike.open': 'Otevřít stezku „{name}“',
+  'live.coming': {
+    one: 'Autobus {route} podle jízdního řádu: {n} zastávku od vaší, bude v {t}',
+    few: 'Autobus {route} podle jízdního řádu: {n} zastávky od vaší, bude v {t}',
+    many: 'Autobus {route} podle jízdního řádu: {n} zastávky od vaší, bude v {t}',
+    other: 'Autobus {route} podle jízdního řádu: {n} zastávek od vaší, bude v {t}',
+  },
+  'live.terminus': 'Autobus {route} je ještě na první zastávce ({stop}), odjíždí v {t}',
+  'live.here': 'Podle jízdního řádu je autobus {route} teď na vaší zastávce',
+  'live.gone': 'Podle jízdního řádu už autobus {route} projel vaši zastávku',
+  'live.leave': 'Stihnete to: vyjděte do {t}',
+  'live.late': 'Nemusíte to stihnout: vyjít bylo třeba v {t}',
+  'live.note': 'Poloha autobusu je podle jízdního řádu, ne podle jeho GPS',
+  'place.photo': 'Otevřít fotku: {name}',
+  'scenic.strollHere': 'Procházky odsud',
+  'hike.merged': 'Spojená trasa',
+  'hike.mergedNote':
+    'Jedna trasa: {names}. Délka, čas, výšky, začátek a konec platí pro celou cestu.',
+  'hike.unmerge': 'Rozdělit',
+  'hike.mergeAsk': 'Spojit trasy?',
+  'hike.mergeMore': 'Přidat ke spojené trase?',
+  'hike.mergeText':
+    '„{name}“ a „{trail}“ budou jedna trasa: délka, čas, výšky, směr i autobusy platí pro celou cestu.',
+  'hike.mergeYes': 'Spojit trasy',
+  'hike.mergeNo': 'Jen ukázat',
+  'places.title': 'Místa',
+  'places.website': 'Web',
+  'scenic.faja-dos-padres.tag': 'Lanovkou dolů k moři',
+  'scenic.faja-dos-padres.text':
+    'Kabina sjíždí téměř kolmý útes k pruhu země u moře s banánovníky, mangovníky a vinicí; dole restaurace a oblázková pláž. 10 minut pěšky od autobusů na silnici v Quinta Grande.',
+  'scenic.penha-de-aguia.tag': 'Orlí skála nad Faialem',
+  'scenic.penha-de-aguia.text':
+    'Obrovská skála 590 m nad mořem a pod ní vesnice Faial s kostelem a terasami. Nejhezčí výhled je ze silnice nad vesnicí, u autobusové zastávky.',
 };

@@ -20,9 +20,7 @@ test('real timetable: every line, journey, grouped lines, and no demo to switch 
   // Every line of CAM and SIGA Rodoeste is in the app: no notice of missing ones.
   await expect(page.getByText(/ще немає/)).toHaveCount(0);
 
-  await page
-    .getByRole('button', { name: /Avenida Mar Alfândega → Igreja Curral das Freiras/ })
-    .click();
+  await page.getByRole('button', { name: /→ Igreja Curral das Freiras/ }).click();
   // Curral das Freiras is served by line 181, the number on the bus since 2026 (it was 81).
   const badge = page.locator('.it-card').first().locator('.route-badge').first();
   await expect(badge).toHaveText('181');

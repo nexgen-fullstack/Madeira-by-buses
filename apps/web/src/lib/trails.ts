@@ -7,6 +7,7 @@ import {
   haversine,
   pointAlong,
   projectOnPolyline,
+  slicePolyline,
   type LatLon,
   type Network,
   type Trail,
@@ -437,4 +438,129 @@ export function nearbyTrails(
     if (onFoot || bus) near.add(other.id);
   }
   return near;
+}
+
+/** One stretch of a walk of several trails merged into one, the way it is walked. */
+export interface WalkPiece {
+  trail: Trail;
+  coords: LatLon[];
+  /** Of the trail chosen (not one added to it). */
+  main: boolean;
+  /** Walked from its trail's end towards its start. */
+  backwards?: boolean;
+}
+
+/** A walk of a trail and others added to it, merged into one way: its facts as one trail's. */
+export interface MergedWalk {
+  pieces: WalkPiece[];
+  start: WalkEnd;
+  end: WalkEnd;
+  length: number;
+  up: number;
+  down: number;
+  low: number;
+  high: number;
+}
+
+/**
+ * A trail and the trails added to it walked as one way, from one end to the other: an
+ * added trail met in the trail's first half is walked first, from its far end into the
+ * trail, and the trail on from where they meet; one met in its second half last, the trail
+ * walked up to there and on along the added one to its far end; one that leaves and comes
+ * back onto the trail instead of the trail's stretch between. Its climbs are each trail's
+ * in the share of it walked (the trails' own heights along the way are not known), its
+ * lowest and highest point theirs.
+ */
+export function mergeWalk(trail: Trail, added: readonly TrailBranch[]): MergedWalk {
+  const main = trailLines(trail).flat();
+  const cum = cumulativeDistances(main);
+  const total = cum.at(-1) ?? 0;
+  const at = (p: LatLon) => projectOnPolyline(main, cum, p);
+  // Each added trail the way it is walked in the merged walk, from where on the trail chosen.
+  type Way = { trail: Trail; coords: LatLon[]; backwards: boolean };
+  const turned = (x: TrailBranch): Way => ({
+    trail: x.trail,
+    coords: [...x.coords].reverse(),
+    backwards: !x.reversed,
+  });
+  const asIs = (x: TrailBranch): Way => ({
+    trail: x.trail,
+    coords: x.coords,
+    backwards: x.reversed,
+  });
+  let into: { way: Way; along: number } | undefined;
+  let out: { way: Way; along: number } | undefined;
+  const instead: { way: Way; from: number; to: number }[] = [];
+  for (const x of added) {
+    const first = at(x.coords[0]!);
+    const last = at(x.coords.at(-1)!);
+    if (x.rejoins) {
+      const forward = first.along <= last.along;
+      instead.push({
+        way: forward ? asIs(x) : turned(x),
+        from: Math.min(first.along, last.along),
+        to: Math.max(first.along, last.along),
+      });
+      continue;
+    }
+    // Where it meets the trail; the trail's longer part is kept: met in its first half, the
+    // added trail is walked first, into it, and the trail on from there; in its second
+    // half, the trail up to there and the added trail last, off it.
+    const meets = last.offset < first.offset ? last : first;
+    const endsOnIt = meets === last;
+    if (meets.along < total / 2) {
+      const way = endsOnIt ? asIs(x) : turned(x);
+      if (!into || meets.along < into.along) into = { way, along: meets.along };
+    } else {
+      const way = endsOnIt ? turned(x) : asIs(x);
+      if (!out || meets.along > out.along) out = { way, along: meets.along };
+    }
+  }
+  const from = into?.along ?? 0;
+  const to = out?.along ?? total;
+  const pieces: WalkPiece[] = [];
+  const piece = (w: Way): WalkPiece => ({ ...w, main: false });
+  if (into) pieces.push(piece(into.way));
+  // The trail's stretch, the other ways instead of its parts between where they leave and rejoin.
+  let along = from;
+  for (const r of instead
+    .filter((r) => r.from >= from && r.to <= to)
+    .sort((a, b) => a.from - b.from)) {
+    if (r.from < along) continue;
+    if (r.from - along > 1)
+      pieces.push({ trail, coords: slicePolyline(main, cum, along, r.from), main: true });
+    pieces.push(piece(r.way));
+    along = r.to;
+  }
+  if (to - along > 1)
+    pieces.push({ trail, coords: slicePolyline(main, cum, along, to), main: true });
+  if (out) pieces.push(piece(out.way));
+
+  let length = 0;
+  let up = 0;
+  let down = 0;
+  let low = trail.low;
+  let high = trail.high;
+  for (const p of pieces) {
+    const m = lengthOf(p.coords);
+    length += m;
+    const share = p.trail.length > 0 ? Math.min(1, m / p.trail.length) : 0;
+    // A trail walked from its end to its start goes down what it climbs.
+    up += share * (p.backwards ? p.trail.down : p.trail.up);
+    down += share * (p.backwards ? p.trail.up : p.trail.down);
+    low = Math.min(low, p.trail.low);
+    high = Math.max(high, p.trail.high);
+  }
+  const first = pieces[0];
+  const last = pieces.at(-1);
+  return {
+    pieces,
+    start: { at: first?.coords[0] ?? startOf(trail), trail: first?.trail ?? trail },
+    end: { at: last?.coords.at(-1) ?? endOf(trail), trail: last?.trail ?? trail },
+    length,
+    up: Math.round(up),
+    down: Math.round(down),
+    low,
+    high,
+  };
 }

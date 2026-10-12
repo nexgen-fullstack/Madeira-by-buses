@@ -15,8 +15,10 @@ export interface Trail {
   ref?: string;
   name: string;
   kind: TrailKind;
-  /** OpenStreetMap's relation, for its page there. */
+  /** OpenStreetMap's relation, for its page there (a way of it, for a trail mapped as ways only). */
   osm: number;
+  /** Mapped as ways only, with no route of its own (`osm` is one of its ways). */
+  osmType?: 'way';
   /** Metres along the trail. */
   length: number;
   /** Metres climbed and gone down walking it from its start to its end. */

@@ -21,6 +21,7 @@ export type WorkerRequest =
   | { id: number; method: 'last'; request: PlanRequest }
   | { id: number; method: 'walks'; requests: PlanRequest[] }
   | { id: number; method: 'roads'; url: string }
+  | { id: number; method: 'snap'; p: LatLon; accuracy: number; speed: number }
   | {
       id: number;
       method: 'travel';
@@ -38,7 +39,14 @@ export type WorkerResponse =
       id: number;
       ok: true;
       result:
-        Itinerary[] | Itinerary | Ahead | null | true | (Itinerary | null)[] | (Travel | null)[];
+        | Itinerary[]
+        | Itinerary
+        | Ahead
+        | null
+        | true
+        | LatLon
+        | (Itinerary | null)[]
+        | (Travel | null)[];
     }
   | { id: number; ok: false; error: string };
 
@@ -101,6 +109,10 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
         .catch((err: unknown) => reply(failure(msg.id, err)));
       return;
     }
+    if (msg.method === 'snap') {
+      reply({ id: msg.id, ok: true, result: snap(msg.p, msg.accuracy, msg.speed) });
+      return;
+    }
     const timeout = new Promise((resolve) => setTimeout(resolve, WALK_WAIT));
     if (msg.method === 'travel') {
       void Promise.race([Promise.all([walkReady, roadsReady]), timeout]).then(() => {
@@ -134,3 +146,18 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
     reply(failure(msg.id, err));
   }
 };
+
+/** Faster than this (m/s, ~25 km/h), the phone is in a bus or a car: on the road, not the pavement. */
+const DRIVING = 7;
+
+/**
+ * Where the phone is on the ways rather than in the houses: on foot on the nearest
+ * pavement, footway or path (the side of the road the fix is on), at speed on the nearest
+ * road; as far as the fix may be off (its accuracy), within reason. Null: nothing so near.
+ */
+function snap(p: LatLon, accuracy: number, speed: number): LatLon | null {
+  // A fix in a block of houses is often 20–40 m from the street it was taken on.
+  const max = Math.max(35, Math.min(accuracy * 2.5, 60));
+  if (speed > DRIVING && roads) return roads.snap(p, max)?.point ?? null;
+  return walkGraph?.onPavement(p, max)?.point ?? null;
+}

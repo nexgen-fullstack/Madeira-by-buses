@@ -548,4 +548,36 @@ export const pl: Dict = {
   'hike.startFrom': 'Zacznij od:',
   'hike.withAdded': 'Razem z dodanymi: {km} km · ≈ {time}',
   'hike.open': 'Otwórz szlak „{name}”',
+  'live.coming': {
+    one: 'Autobus {route} według rozkładu: {n} przystanek od Twojego, będzie o {t}',
+    few: 'Autobus {route} według rozkładu: {n} przystanki od Twojego, będzie o {t}',
+    many: 'Autobus {route} według rozkładu: {n} przystanków od Twojego, będzie o {t}',
+    other: 'Autobus {route} według rozkładu: {n} przystanku od Twojego, będzie o {t}',
+  },
+  'live.terminus': 'Autobus {route} jest jeszcze na pierwszym przystanku ({stop}), odjeżdża o {t}',
+  'live.here': 'Według rozkładu autobus {route} jest teraz na Twoim przystanku',
+  'live.gone': 'Według rozkładu autobus {route} minął już Twój przystanek',
+  'live.leave': 'Zdążysz: wyjdź do {t}',
+  'live.late': 'Możesz nie zdążyć: trzeba było wyjść o {t}',
+  'live.note': 'Położenie autobusu wynika z rozkładu, nie z jego GPS',
+  'place.photo': 'Otwórz zdjęcie: {name}',
+  'scenic.strollHere': 'Spacery stąd',
+  'hike.merged': 'Połączona trasa',
+  'hike.mergedNote':
+    'Jedna trasa: {names}. Długość, czas, wysokości, start i meta dotyczą całej drogi.',
+  'hike.unmerge': 'Rozdziel',
+  'hike.mergeAsk': 'Połączyć trasy?',
+  'hike.mergeMore': 'Dodać do połączonej trasy?',
+  'hike.mergeText':
+    '„{name}” i „{trail}” staną się jedną trasą: długość, czas, wysokości, kierunek i autobusy dotyczą całej drogi.',
+  'hike.mergeYes': 'Połącz trasy',
+  'hike.mergeNo': 'Tylko pokaż',
+  'places.title': 'Miejsca',
+  'places.website': 'Strona',
+  'scenic.faja-dos-padres.tag': 'Kolejką w dół nad morze',
+  'scenic.faja-dos-padres.text':
+    'Kabina zjeżdża niemal pionowym klifem na skrawek ziemi nad morzem z bananami, mango i winoroślą; na dole restauracja i kamienista plaża. 10 minut pieszo od autobusów na drodze w Quinta Grande.',
+  'scenic.penha-de-aguia.tag': 'Orla Skała nad Faial',
+  'scenic.penha-de-aguia.text':
+    'Ogromna skała wysoka na 590 m nad morzem, a u jej stóp wioska Faial z kościołem i tarasami. Najlepszy widok z drogi nad wioską, przy przystanku.',
 };

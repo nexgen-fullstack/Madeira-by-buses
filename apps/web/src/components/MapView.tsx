@@ -1,5 +1,17 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Bus, Camera, Check, Flag, MapPin, Signpost, X } from 'lucide-react';
+import {
+  Bus,
+  Camera,
+  Check,
+  Clock,
+  ExternalLink,
+  Flag,
+  LayoutGrid,
+  MapPin,
+  Phone,
+  Signpost,
+  X,
+} from 'lucide-react';
 import {
   GeolocateControl,
   LngLatBounds,
@@ -20,6 +32,8 @@ import { useI18n } from '../i18n.ts';
 import { luminance, readableOn } from '../lib/color.ts';
 import { decodePlace, encodePlace } from '../lib/itinerary.ts';
 import { rememberPosition } from '../lib/geolocation.ts';
+import { Snapper } from '../lib/snap.ts';
+import { placePhoto, type PlacePhoto } from '../lib/placePhoto.ts';
 import { hideLaunch } from '../lib/launch.ts';
 import {
   RUN_WIDTH,
@@ -56,6 +70,10 @@ import { useApp } from '../state/app.tsx';
 import { LayerSwitcher } from './LayerSwitcher.tsx';
 import { LineCard, LineChooser, type LinePick } from './LineCard.tsx';
 import { MapContentContext, type PickField, type Spotlight } from './mapContext.tsx';
+import { busImage, busImageId } from './busImage.ts';
+import { PlacesChip, PlacesPicker, poiImage, poiImageId } from './PlacesPicker.tsx';
+import { loadPois, poiName, type Poi, type PoiCategory } from '../lib/pois.ts';
+import type { LiveBus } from '../lib/liveBus.ts';
 
 // MapLibre computes its worker URL at runtime, which bundlers cannot see; point it at the bundled worker.
 setWorkerUrl(maplibreWorkerUrl);
@@ -69,6 +87,8 @@ interface PickedPlace {
   subclass?: string;
   lat: number;
   lon: number;
+  /** One of the places of the "Places" button: its kind, hours, phone, website. */
+  poi?: Poi;
 }
 
 /** A stop tapped while choosing a place on the map: chosen as the stop while the pin stays on it. */
@@ -630,6 +650,44 @@ function addWalkDots(map: MapLibreMap, content: MapContent) {
   }
 }
 
+/** Puts the places of the kind chosen on the map, its dot drawn once. */
+async function applyPois(map: MapLibreMap, pois: readonly Poi[]) {
+  const category = pois[0]?.category;
+  if (category && !map.hasImage(poiImageId(category))) {
+    const image = await poiImage(category);
+    if (image && !map.hasImage(poiImageId(category)))
+      map.addImage(poiImageId(category), image, { pixelRatio: 2 });
+  }
+  (map.getSource('mb-pois') as GeoJSONSource | undefined)?.setData({
+    type: 'FeatureCollection',
+    features: pois.map((p, i) => ({
+      type: 'Feature',
+      properties: { i, image: poiImageId(p.category), name: p.name, color: '#3c4043' },
+      geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+    })),
+  });
+}
+
+/** Puts the buses where they are now on the map, each look drawn once. */
+function applyBuses(map: MapLibreMap, buses: readonly LiveBus[] | undefined) {
+  const source = map.getSource('mb-buses') as GeoJSONSource | undefined;
+  if (!source) return;
+  for (const b of buses ?? []) {
+    const id = busImageId(b);
+    if (map.hasImage(id)) continue;
+    const image = busImage(b);
+    if (image) map.addImage(id, image, { pixelRatio: 2 });
+  }
+  source.setData({
+    type: 'FeatureCollection',
+    features: (buses ?? []).map((b) => ({
+      type: 'Feature',
+      properties: { image: busImageId(b), aboard: Boolean(b.aboard) },
+      geometry: { type: 'Point', coordinates: [b.lon, b.lat] },
+    })),
+  });
+}
+
 function addOverlay(map: MapLibreMap, base: BaseLayer) {
   if (map.getSource('mb-lines')) return;
   const images: [string, () => ImageData | undefined][] = [
@@ -735,6 +793,20 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
       'circle-color': TRAIL_RED,
       'circle-stroke-color': '#ffffff',
       'circle-stroke-width': 2,
+    },
+  });
+  // The places of the kind chosen on the "Places" button, under the ways shown.
+  map.addSource('mb-pois', { type: 'geojson', data: EMPTY });
+  map.addLayer({
+    id: 'mb-poi',
+    type: 'symbol',
+    source: 'mb-pois',
+    layout: {
+      'icon-image': ['get', 'image'],
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.55, 14, 0.8, 17, 1],
+      'icon-padding': 1,
+      // Where they crowd (far out), some step aside; closer in, all of them.
+      'icon-allow-overlap': false,
     },
   });
   map.addSource('mb-lines', { type: 'geojson', data: EMPTY });
@@ -1017,6 +1089,29 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
       'symbol-sort-key': ['match', ['get', 'kind'], 'board', 2, 1],
     },
   });
+  // The buses of the way where they are now, over everything else.
+  map.addSource('mb-buses', { type: 'geojson', data: EMPTY });
+  map.addLayer({
+    id: 'mb-bus',
+    type: 'symbol',
+    source: 'mb-buses',
+    layout: {
+      'icon-image': ['get', 'image'],
+      // The bus you are in a size larger: it stands out on its own line.
+      'icon-size': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        10,
+        ['case', ['get', 'aboard'], 1.05, 0.8],
+        15,
+        ['case', ['get', 'aboard'], 1.45, 1.1],
+      ],
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+      'symbol-sort-key': ['case', ['get', 'aboard'], 2, 1],
+    },
+  });
   if (map.getStyle().glyphs) {
     map.addLayer({
       id: 'mb-trail-label',
@@ -1034,6 +1129,26 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
         'text-max-width': 9,
       },
       paint: { 'text-color': TRAIL_RED, 'text-halo-color': '#ffffff', 'text-halo-width': 1.6 },
+    });
+    map.addLayer({
+      id: 'mb-poi-label',
+      type: 'symbol',
+      source: 'mb-pois',
+      minzoom: 15.5,
+      layout: {
+        'text-field': ['get', 'name'],
+        'text-size': 11,
+        'text-offset': [0, 1.2],
+        'text-anchor': 'top',
+        'text-max-width': 9,
+        'text-optional': true,
+        'text-font': ['Noto Sans Regular'],
+      },
+      paint: {
+        'text-color': ['get', 'color'],
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 1.5,
+      },
     });
     map.addLayer({
       id: 'mb-net-label',
@@ -1269,10 +1384,15 @@ function plannedPlaces(net: Network | undefined, myLocation: string) {
 }
 
 export default function MapView({ className }: { className?: string }) {
-  const { content, pick, pickArea, pickStart, setPick, spotlight } = useContext(MapContentContext);
+  const { content, pick, pickArea, pickStart, setPick, spotlight, buses } =
+    useContext(MapContentContext);
+  const busesRef = useRef(buses);
+  busesRef.current = buses;
   const { settings, setSettings, data } = useApp();
   const t = useI18n();
   const net = data.status === 'ready' ? data.net : undefined;
+  const plannerRef = useRef(data.status === 'ready' ? data.planner : undefined);
+  plannerRef.current = data.status === 'ready' ? data.planner : undefined;
   // The map's handlers are set up once; they read these.
   const pickRef = useRef(pick);
   pickRef.current = pick;
@@ -1292,6 +1412,18 @@ export default function MapView({ className }: { className?: string }) {
   const styleLoaded = useRef(false);
   const shownStyle = useRef(`${layers.base}:fallback`);
   const [picked, setPicked] = useState<PickedPlace | undefined>();
+  // A place's photo opened large.
+  const [bigPhoto, setBigPhoto] = useState<PlacePhoto | undefined>();
+  // The "Places" button: its list of kinds open, the kind shown on the map, the places.
+  const [placesOpen, setPlacesOpen] = useState(false);
+  const [poiCategory, setPoiCategory] = useState<PoiCategory | undefined>();
+  const [pois, setPois] = useState<Poi[] | undefined>();
+  const shownPois = useMemo(
+    () => (poiCategory && pois ? pois.filter((p) => p.category === poiCategory) : []),
+    [poiCategory, pois],
+  );
+  const poisRef = useRef<Poi[]>([]);
+  poisRef.current = shownPois;
   const [note, setNote] = useState<LineNote | undefined>();
   // A line tapped: its card, or a short list when several lie under the finger.
   const [linePick, setLinePick] = useState<LinePick | undefined>();
@@ -1362,16 +1494,42 @@ export default function MapView({ className }: { className?: string }) {
     const locate = new GeolocateControl({
       positionOptions: { enableHighAccuracy: true },
       trackUserLocation: true,
+      // Its own dot stands where the GPS says, often in a house beside the street: ours
+      // stands on the pavement (on the road, going by bus), see `Snapper`.
+      showUserLocation: false,
+      showAccuracyCircle: false,
     });
+    const me = document.createElement('div');
+    me.className = 'maplibregl-user-location-dot';
+    const meMarker = new Marker({ element: me });
+    let snapper: Snapper | undefined;
+    let shownFix = 0;
     // Where the phone was found: a trail then starts at its nearer end.
-    locate.on('geolocate', (p) =>
-      rememberPosition({
+    locate.on('geolocate', (p) => {
+      const fix = {
         lat: p.coords.latitude,
         lon: p.coords.longitude,
         accuracy: p.coords.accuracy,
         timestamp: p.timestamp,
-      }),
+      };
+      rememberPosition(fix);
+      const planner = plannerRef.current;
+      if (planner) snapper ??= new Snapper(planner);
+      const id = ++shownFix;
+      void (snapper ? snapper.place({ ...fix, speed: p.coords.speed }) : Promise.resolve(fix)).then(
+        (at) => {
+          if (id !== shownFix) return;
+          meMarker.setLngLat([at.lon, at.lat]);
+          if (!me.isConnected) meMarker.addTo(map);
+        },
+      );
+    });
+    // Located no more (the button pressed off, or no location): no dot.
+    const watching = () => (locate as unknown as { _watchState?: string })._watchState;
+    locate.on('trackuserlocationend', () =>
+      window.setTimeout(() => watching() === 'OFF' && meMarker.remove(), 0),
     );
+    locate.on('error', () => meMarker.remove());
     // Its button pressed: the sheet over the map goes down, the place in full view.
     locate.on('trackuserlocationstart', () => window.dispatchEvent(new Event('mb-sheet-down')));
     map.addControl(locate, 'top-right');
@@ -1388,6 +1546,8 @@ export default function MapView({ className }: { className?: string }) {
       fitted.current = {};
       setReady(true);
       apply(map, contentRef.current, fitted);
+      applyBuses(map, busesRef.current);
+      void applyPois(map, poisRef.current);
     });
     map.on('click', (e: MapMouseEvent) => {
       releasePins(map);
@@ -1471,6 +1631,15 @@ export default function MapView({ className }: { className?: string }) {
       }
       setLinePick(undefined);
       setLineChoice(undefined);
+      // One of the places of the kind chosen: its card with its hours, phone and website.
+      const mine = features.find((f) => f.layer.id === 'mb-poi');
+      if (mine) {
+        const p = poisRef.current[Number(mine.properties?.i)];
+        if (p) {
+          setPicked({ name: p.name, lat: p.lat, lon: p.lon, poi: p });
+          return;
+        }
+      }
       const poi = features.find((f) => f.sourceLayer === 'poi' && f.properties?.name);
       if (poi && poi.geometry.type === 'Point') {
         const [lon, lat] = poi.geometry.coordinates as [number, number];
@@ -1605,6 +1774,36 @@ export default function MapView({ className }: { className?: string }) {
     if (map && ready && map.getSource('mb-lines')) apply(map, content, fitted);
   }, [content, ready]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map && ready) applyBuses(map, buses);
+  }, [buses, ready]);
+
+  // The places of the kind chosen: loaded the first time, put on the map; when none is in
+  // view, the map goes to the nearest.
+  useEffect(() => {
+    if (!poiCategory || pois) return;
+    let cancelled = false;
+    void loadPois().then((p) => !cancelled && setPois(p));
+    return () => {
+      cancelled = true;
+    };
+  }, [poiCategory, pois]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    void applyPois(map, shownPois);
+    if (shownPois.length === 0) return;
+    const bounds = map.getBounds();
+    if (shownPois.some((p) => bounds.contains([p.lon, p.lat]))) return;
+    const c = map.getCenter();
+    const centre = { lat: c.lat, lon: c.lng };
+    const nearest = shownPois.reduce((a, b) =>
+      haversine(centre, b) < haversine(centre, a) ? b : a,
+    );
+    map.easeTo({ center: [nearest.lon, nearest.lat], zoom: Math.max(map.getZoom(), 14) });
+  }, [shownPois, ready]);
+
   // Every stop and line: built the first time they are shown, put back after a style change.
   const transit = useMemo(
     () => (layers.transit && net ? transitGeoJson(net) : undefined),
@@ -1653,7 +1852,8 @@ export default function MapView({ className }: { className?: string }) {
     for (const s of spots) if (!byId.has(s.id)) byId.set(s.id, s);
     return [...byId.values()];
   }, [layers.scenic, content.scenic, trailsOn, trailPhotosOn, hikeChosen, allTrails, trailIds]);
-  useScenicMarkers(mapRef, ready, pick ? undefined : photoSpots);
+  // A kind of place shown from the "Places" button: its dots alone, not hidden under photos.
+  useScenicMarkers(mapRef, ready, pick || poiCategory ? undefined : photoSpots);
   // A run or a line tapped belongs to the map shown; another one, forget it.
   useEffect(() => {
     setNote(undefined);
@@ -1733,6 +1933,11 @@ export default function MapView({ className }: { className?: string }) {
   };
 
   const pickedLabel = picked?.name || t.t('place.pin');
+  // A viewpoint, a beach, a peak tapped: the view from there, when there is a photo of it.
+  const pickedPhoto = useMemo(
+    () => (picked && (picked.klass || picked.subclass) ? placePhoto(picked) : undefined),
+    [picked],
+  );
   return (
     <div className={`${className ?? ''} map-wrap${pick ? ' map-wrap--picking' : ''}`}>
       <div ref={container} className="map-canvas" role="region" aria-label={t.t('map.label')} />
@@ -1829,7 +2034,37 @@ export default function MapView({ className }: { className?: string }) {
         >
           <Camera size={18} />
         </button>
+        {/* The places of everyday life, as a maps app groups them: hospitals, hotels, cafés… */}
+        <button
+          type="button"
+          className="map-tool"
+          aria-pressed={poiCategory !== undefined}
+          aria-expanded={placesOpen}
+          aria-label={t.t('places.title')}
+          title={t.t('places.title')}
+          onClick={() => setPlacesOpen((o) => !o)}
+        >
+          <LayoutGrid size={18} />
+        </button>
       </div>
+      {poiCategory && !placesOpen && !pick && (
+        <PlacesChip
+          category={poiCategory}
+          onOpen={() => setPlacesOpen(true)}
+          onClear={() => setPoiCategory(undefined)}
+        />
+      )}
+      {placesOpen && !pick && (
+        <PlacesPicker
+          chosen={poiCategory}
+          onChoose={(c) => {
+            setPoiCategory(c);
+            setPlacesOpen(false);
+            setPicked(undefined);
+          }}
+          onClose={() => setPlacesOpen(false)}
+        />
+      )}
       {note && !pick && (
         <div className="place-card" role="dialog" aria-label={note.title}>
           <div className="place-card__text">
@@ -1868,12 +2103,43 @@ export default function MapView({ className }: { className?: string }) {
       )}
       {picked && !pick && (
         <div className="place-card" role="dialog" aria-label={pickedLabel}>
+          {pickedPhoto && (
+            <button
+              type="button"
+              className="place-card__photo"
+              aria-label={t.t('place.photo', { name: pickedPhoto.title })}
+              onClick={() => setBigPhoto(pickedPhoto)}
+            >
+              <img src={pickedPhoto.sm} alt="" width={480} height={320} />
+            </button>
+          )}
           <div className="place-card__text">
             <div className="strong">{pickedLabel}</div>
             <div className="muted small">
-              {poiLabel(settings.lang, picked.klass, picked.subclass) ??
-                `${picked.lat.toFixed(5)}, ${picked.lon.toFixed(5)}`}
+              {picked.poi
+                ? poiName(picked.poi.category, settings.lang)
+                : (poiLabel(settings.lang, picked.klass, picked.subclass) ??
+                  `${picked.lat.toFixed(5)}, ${picked.lon.toFixed(5)}`)}
             </div>
+            {picked.poi?.hours && (
+              <div className="small place-card__line">
+                <Clock size={13} aria-hidden /> {picked.poi.hours}
+              </div>
+            )}
+            {(picked.poi?.phone || picked.poi?.web) && (
+              <div className="small place-card__line">
+                {picked.poi.phone && (
+                  <a href={`tel:${picked.poi.phone.split(/[;,]/)[0]!.replace(/\s/g, '')}`}>
+                    <Phone size={13} aria-hidden /> {picked.poi.phone.split(/[;,]/)[0]}
+                  </a>
+                )}
+                {picked.poi.web && (
+                  <a href={picked.poi.web} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink size={13} aria-hidden /> {t.t('places.website')}
+                  </a>
+                )}
+              </div>
+            )}
           </div>
           <div className="place-card__actions">
             <button
@@ -1905,6 +2171,45 @@ export default function MapView({ className }: { className?: string }) {
               <X size={16} />
             </button>
           </div>
+        </div>
+      )}
+      {bigPhoto && (
+        <div
+          className="photo-view"
+          role="dialog"
+          aria-label={bigPhoto.title}
+          onClick={() => setBigPhoto(undefined)}
+        >
+          <img
+            src={bigPhoto.lg}
+            alt={bigPhoto.title}
+            style={{ backgroundImage: `url("${bigPhoto.sm}")` }}
+          />
+          <div className="photo-view__text">
+            <div className="strong">{bigPhoto.title}</div>
+            {bigPhoto.credit && (
+              <a
+                className="small"
+                href={bigPhoto.credit.source}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {t.t('scenic.photo', {
+                  author: bigPhoto.credit.author,
+                  license: bigPhoto.credit.license,
+                })}
+              </a>
+            )}
+          </div>
+          <button
+            type="button"
+            className="icon-button photo-view__close"
+            aria-label={t.t('close')}
+            onClick={() => setBigPhoto(undefined)}
+          >
+            <X size={20} />
+          </button>
         </div>
       )}
     </div>

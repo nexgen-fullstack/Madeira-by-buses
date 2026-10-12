@@ -68,6 +68,7 @@ export type DestinationId =
   | 'formosa'
   | 'cidade'
   | 'cabo-girao'
+  | 'faja-dos-padres'
   | 'camara-lobos'
   | 'porto-moniz'
   | 'santana'
@@ -90,6 +91,7 @@ export type DestinationId =
   | 'arco-sao-jorge'
   | 'sao-jorge'
   | 'guindaste'
+  | 'penha-de-aguia'
   | 'porto-da-cruz'
   | 'portela'
   | 'machico'
@@ -212,6 +214,20 @@ export const DESTINATIONS: readonly Destination[] = [
       author: 'H. Zell',
       ...BY_SA_3,
       source: commons('View_from_Miradouro_do_Cabo_Gir%C3%A3o_02.jpg'),
+    },
+  },
+  {
+    id: 'faja-dos-padres',
+    name: 'Fajã dos Padres',
+    region: 'west',
+    lat: 32.65677,
+    lon: -17.0217,
+    // The cable car's top station, down a lane from the buses on the road above.
+    reach: 900,
+    credit: {
+      author: 'Asurnipal',
+      ...BY_SA_4,
+      source: commons('Madeira-Quinta_Grande-Faja_dos_Padres-01ASD.jpg'),
     },
   },
   {
@@ -415,6 +431,19 @@ export const DESTINATIONS: readonly Destination[] = [
     lat: 32.79425,
     lon: -16.84936,
     uncredited: true,
+  },
+  {
+    id: 'penha-de-aguia',
+    name: "Penha d'Águia",
+    region: 'north',
+    lat: 32.79,
+    lon: -16.86031,
+    credit: {
+      author: 'giggel',
+      license: 'CC BY 3.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by/3.0',
+      source: commons('Faial_mit_dem_Adlerfelsen_5-09_-_panoramio.jpg'),
+    },
   },
   {
     id: 'porto-da-cruz',

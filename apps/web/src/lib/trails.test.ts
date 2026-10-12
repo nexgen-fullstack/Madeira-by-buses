@@ -9,6 +9,7 @@ import {
 import {
   branchKeys,
   endOf,
+  mergeWalk,
   nearbyTrails,
   reversedTrail,
   startsAtEnd,
@@ -209,5 +210,41 @@ describe('the trails near one chosen', () => {
   it('are those met, half an hour on foot, or half an hour by bus; none of the rest', () => {
     const near = nearbyTrails(main, [main, walk, bus, far, met], net, ['met']);
     expect([...near].sort()).toEqual(['bus', 'main', 'met', 'walk']);
+  });
+});
+
+describe('trails merged into one walk', () => {
+  // A levada 2 km east along 32.70, climbing 100 m and going down 20.
+  const main = trail('main', [32.7, -16.9], [32.7, -16.88]);
+  const km = (m: number) => Math.round(m / 100) / 10;
+
+  it('walks a trail met near the start first, from its far end, and the trail on', () => {
+    // A path of ~1.1 km coming down from the north to the levada's start.
+    const lead = trail('lead', [32.71, -16.9], [32.7, -16.9]);
+    const branches = trailBranches(main, [main, lead]);
+    const walk = mergeWalk(main, branches);
+    expect(walk.pieces.map((p) => p.trail.id)).toEqual(['lead', 'main']);
+    expect(haversine(walk.start.at, { lat: 32.71, lon: -16.9 })).toBeLessThan(5);
+    expect(haversine(walk.end.at, endOf(main))).toBeLessThan(5);
+    expect(km(walk.length)).toBeCloseTo(km(1112 + 1873), 0);
+    // The path walked as mapped (north to south): its own climb, and all of the levada's.
+    expect(walk.up).toBe(200);
+    expect(walk.down).toBe(40);
+  });
+
+  it('walks a trail met near the end last, the levada up to there', () => {
+    const off = trail('off', [32.7, -16.88], [32.69, -16.88]);
+    const walk = mergeWalk(main, trailBranches(main, [main, off]));
+    expect(walk.pieces.map((p) => p.trail.id)).toEqual(['main', 'off']);
+    expect(haversine(walk.end.at, { lat: 32.69, lon: -16.88 })).toBeLessThan(5);
+  });
+
+  it('starts at the other end when the whole walk is turned round', () => {
+    const lead = trail('lead', [32.71, -16.9], [32.7, -16.9]);
+    const back = reversedTrail(main);
+    const walk = mergeWalk(back, trailBranches(back, [back, lead]));
+    expect(walk.pieces.map((p) => p.trail.id)).toEqual(['main', 'lead']);
+    expect(haversine(walk.start.at, { lat: 32.7, lon: -16.88 })).toBeLessThan(5);
+    expect(haversine(walk.end.at, { lat: 32.71, lon: -16.9 })).toBeLessThan(5);
   });
 });

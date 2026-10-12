@@ -13,7 +13,7 @@ test('the ride keeps being followed on other screens', async ({ page }) => {
   await allowSimulation(page);
   await page.goto('./');
   await raiseSheet(page);
-  await page.getByRole('button', { name: /Funchal \(Avenida.* → Santana/ }).click();
+  await page.getByRole('button', { name: /→ Santana/ }).click();
   await page.locator('.it-card').first().click();
   await raiseSheet(page);
   await page.getByRole('button', { name: 'Simulate' }).click();

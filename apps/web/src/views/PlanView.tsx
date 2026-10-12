@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarClock, ChevronRight, History, Loader2, MapPinned, Sparkles } from 'lucide-react';
-import { addDays, madeiraNow, normalise } from '@madeirabus/engine';
+import { addDays, madeiraNow, normalise, type StopGroup } from '@madeirabus/engine';
 import { ItineraryCard } from '../components/ItineraryCard.tsx';
 import { ItineraryDetail } from '../components/ItineraryDetail.tsx';
 import { MapContentContext, useMapContent } from '../components/mapContext.tsx';
@@ -122,6 +122,16 @@ export function PlanView({ route }: { route: Route }) {
   // As in a maps app, a trip to somewhere starts where you are, unless you say otherwise.
   const locatedFor = useRef<string | null>(null);
   const requestLocation = geo.request;
+  // A suggested trip's own start, for when the phone cannot tell where it is.
+  const fallbackFrom = useRef<string | undefined>(undefined);
+  const startFromSuggestion = useCallback(() => {
+    const from = fallbackFrom.current;
+    fallbackFrom.current = undefined;
+    if (from) setParams({ from, i: undefined });
+  }, [setParams]);
+  useEffect(() => {
+    if (geo.error && !fromParam) startFromSuggestion();
+  }, [geo.error, fromParam, startFromSuggestion]);
   useEffect(() => {
     if (!toParam || fromParam || locatedFor.current === toParam) return;
     locatedFor.current = toParam;
@@ -129,12 +139,13 @@ export function PlanView({ route }: { route: Route }) {
     void (permission ?? Promise.resolve(undefined))
       .catch(() => undefined)
       .then((status) => {
+        if (status?.state === 'denied') startFromSuggestion();
         if (status?.state === 'denied' || locatedFor.current !== toParam) return;
         wantLocation.current = 'from';
         autoLocate.current = true;
         requestLocation();
       });
-  }, [toParam, fromParam, requestLocation]);
+  }, [toParam, fromParam, requestLocation, startFromSuggestion]);
 
   // Plan whenever both ends are known.
   const baseKey =
@@ -253,8 +264,15 @@ export function PlanView({ route }: { route: Route }) {
     // "Estrada Aeroporto", a street in Funchal far from the airport.
     const find = (q: string) =>
       net.searchStops(q, 1).find((g) => normalise(g.name).startsWith(normalise(q)));
-    return SUGGESTIONS.map(([a, b]) => [find(a), find(b)] as const)
-      .filter((pair) => pair[0] && pair[1])
+    // Each once, by where it goes: as every trip, it starts where the phone is (its own start
+    // only when the phone cannot tell), and a place the person sets themselves elsewhere.
+    const seen = new Set<string>();
+    return SUGGESTIONS.map(([a, b]) => ({ from: find(a), to: find(b) }))
+      .filter((s): s is { from: StopGroup; to: StopGroup } => {
+        if (!s.from || !s.to || seen.has(s.to.name)) return false;
+        seen.add(s.to.name);
+        return true;
+      })
       .slice(0, 4);
   }, [net]);
 
@@ -487,14 +505,17 @@ export function PlanView({ route }: { route: Route }) {
             <>
               {recentTrips.length > 0 && <h3 className="plan__subtitle">{t.t('plan.ideas')}</h3>}
               <div className="chips">
-                {suggestions.map(([a, b]) => (
+                {suggestions.map((sug) => (
                   <button
-                    key={`${a!.name}>${b!.name}`}
+                    key={sug.to.name}
                     type="button"
                     className="chip"
-                    onClick={() => setParams({ from: encode(a!), to: encode(b!), i: undefined })}
+                    onClick={() => {
+                      fallbackFrom.current = encode(sug.from);
+                      setParams({ from: undefined, to: encode(sug.to), i: undefined });
+                    }}
                   >
-                    <Sparkles size={14} aria-hidden /> {a!.name} → {b!.name}
+                    <Sparkles size={14} aria-hidden /> → {sug.to.name}
                   </button>
                 ))}
               </div>

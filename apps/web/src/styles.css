@@ -1336,6 +1336,30 @@ input[type='time'],
 .detail__sub {
   color: var(--muted);
 }
+/* Where the bus to take is now by its timetable, and when to leave to catch it. */
+.live-bus {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--brand-soft);
+  font-size: 14px;
+}
+.live-bus > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--brand);
+}
+.live-bus__leave {
+  color: var(--ok);
+  font-weight: 600;
+}
+.live-bus__late {
+  color: var(--danger);
+  font-weight: 600;
+}
 .detail__actions {
   display: flex;
   flex-wrap: wrap;
@@ -2486,6 +2510,58 @@ input[type='time'],
   width: 32px;
   height: 32px;
 }
+/* The view from a place tapped, across the top of its card; a tap opens it large. */
+.place-card__photo {
+  flex: 1 1 100%;
+  display: block;
+  margin: -10px -12px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 14px 14px 0 0;
+  overflow: hidden;
+  background: var(--surface-2);
+  cursor: zoom-in;
+}
+.place-card__photo img {
+  display: block;
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+}
+.photo-view {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  background: rgb(0 0 0 / 88%);
+  color: #fff;
+}
+.photo-view img {
+  max-width: 100%;
+  max-height: 78vh;
+  border-radius: 10px;
+  background-size: cover;
+  object-fit: contain;
+}
+.photo-view__text {
+  text-align: center;
+}
+.photo-view__text a {
+  color: #d8e6ff;
+}
+.photo-view__close {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: 12px;
+  color: #fff;
+  background: rgb(255 255 255 / 15%);
+}
+
 /* The card of a line tapped on the map, its timetable as a picture. */
 .line-card {
   position: absolute;
@@ -3265,6 +3341,42 @@ input[type='time'],
   text-transform: uppercase;
   opacity: 0.9;
 }
+/* The strolls from the place on its photo: how long, how long it takes, how much it climbs. */
+.destination__strolls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.destination__strolls a {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 9px;
+  border-radius: 10px;
+  background: rgb(0 0 0 / 45%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-decoration: none;
+  backdrop-filter: blur(2px);
+}
+.destination__strolls a > svg {
+  flex: none;
+  margin-top: 2px;
+}
+.destination__facts {
+  display: block;
+  font-weight: 500;
+  opacity: 0.92;
+}
+.destination__facts svg {
+  vertical-align: -1px;
+}
 /* A small "Start" on the photo: the way there from where you are. */
 .destination__start {
   position: absolute;
@@ -3814,4 +3926,175 @@ input[type='time'],
 .stop-spot[aria-pressed='true'] {
   color: var(--brand);
   font-weight: 700;
+}
+
+/* Trails merged into one walk: said so, with a way to part them again. */
+.hike__merged {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--trail-bg);
+  color: var(--text);
+}
+.hike__merged > svg {
+  color: var(--trail);
+}
+.hike__merged .small {
+  flex: 1 1 160px;
+}
+
+/* A question before something changes: over the screen, its answers as buttons. */
+.confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 45%);
+}
+.confirm__card {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 18px 16px 16px;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 30%);
+}
+.confirm__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 32px 8px 0;
+  font-size: 18px;
+}
+.confirm__title svg {
+  color: var(--trail);
+}
+.confirm__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* The "Places" button's kinds of places, by group, as a maps app lists them. */
+.places-picker {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 56px;
+  z-index: 31;
+  display: flex;
+  flex-direction: column;
+  max-width: 460px;
+  max-height: calc(100% - 76px);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 25%);
+  overflow: hidden;
+}
+.places-picker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 4px 16px;
+}
+.places-picker__head h3 {
+  margin: 0;
+  font-size: 17px;
+}
+.places-picker__body {
+  overflow-y: auto;
+  padding: 0 14px 14px;
+}
+.places-picker__body h4 {
+  margin: 12px 0 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.places-picker__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.places-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.places-chip svg {
+  color: var(--poi);
+}
+.places-chip[aria-pressed='true'] {
+  border-color: var(--poi);
+  background: var(--poi);
+  color: #fff;
+}
+.places-chip[aria-pressed='true'] svg {
+  color: #fff;
+}
+/* The kind shown on the map, named under the buttons, with a cross to show none. */
+.places-shown {
+  position: absolute;
+  left: 10px;
+  top: 56px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--poi);
+  color: #fff;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 22%);
+}
+.places-shown__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 4px 7px 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.places-shown__clear.icon-button {
+  width: 30px;
+  height: 30px;
+  color: #fff;
+}
+.place-card__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 2px;
+}
+.place-card__line a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--brand);
 }

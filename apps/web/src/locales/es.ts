@@ -514,4 +514,34 @@ export const es: Dict = {
   'hike.startFrom': 'Empezar en:',
   'hike.withAdded': 'Con los añadidos: {km} km · ≈ {time}',
   'hike.open': 'Abrir el sendero «{name}»',
+  'live.coming': {
+    one: 'Autobús {route} según el horario: a {n} parada de la suya, llega a las {t}',
+    other: 'Autobús {route} según el horario: a {n} paradas de la suya, llega a las {t}',
+  },
+  'live.terminus': 'El autobús {route} aún está en su primera parada ({stop}), sale a las {t}',
+  'live.here': 'Según el horario, el autobús {route} está ahora en su parada',
+  'live.gone': 'Según el horario, el autobús {route} ya pasó por su parada',
+  'live.leave': 'Llega a tiempo: salga antes de las {t}',
+  'live.late': 'Quizá no llegue: había que salir a las {t}',
+  'live.note': 'La posición del autobús sale del horario, no de su GPS',
+  'place.photo': 'Abrir la foto: {name}',
+  'scenic.strollHere': 'Paseos desde aquí',
+  'hike.merged': 'Ruta combinada',
+  'hike.mergedNote':
+    'Una sola ruta: {names}. Distancia, tiempo, alturas, inicio y fin son de todo el camino.',
+  'hike.unmerge': 'Separar',
+  'hike.mergeAsk': '¿Unir las rutas?',
+  'hike.mergeMore': '¿Añadir a la ruta combinada?',
+  'hike.mergeText':
+    '«{name}» y «{trail}» serán una sola ruta: distancia, tiempo, alturas, sentido y autobuses cuentan para todo el camino.',
+  'hike.mergeYes': 'Unir las rutas',
+  'hike.mergeNo': 'Solo mostrar',
+  'places.title': 'Lugares',
+  'places.website': 'Web',
+  'scenic.faja-dos-padres.tag': 'Teleférico hasta la orilla',
+  'scenic.faja-dos-padres.text':
+    'La cabina baja por un acantilado casi vertical hasta una franja de tierra junto al mar con plátanos, mangos y viñas; abajo, un restaurante y una playa de cantos. A 10 minutos a pie de los autobuses de la carretera en Quinta Grande.',
+  'scenic.penha-de-aguia.tag': 'La Roca del Águila sobre Faial',
+  'scenic.penha-de-aguia.text':
+    'Una enorme roca de 590 m sobre el mar y, a sus pies, el pueblo de Faial con su iglesia y bancales. La mejor vista, desde la carretera sobre el pueblo, junto a la parada.',
 };

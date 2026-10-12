@@ -4,11 +4,14 @@ import {
   CalendarClock,
   Footprints,
   Loader2,
+  Mountain,
+  TrendingUp,
+  Waves,
   Navigation,
   Play,
   Route as RouteIcon,
 } from 'lucide-react';
-import { haversine, madeiraNow } from '@madeirabus/engine';
+import { haversine, madeiraNow, trailMinutes, type Itinerary } from '@madeirabus/engine';
 import { ItineraryCard } from '../components/ItineraryCard.tsx';
 import { ItineraryDetail } from '../components/ItineraryDetail.tsx';
 import { ScenicArt } from '../components/ScenicCard.tsx';
@@ -19,7 +22,7 @@ import { ModeTabs, modeOf, TravelCard, useTravels } from '../components/TravelMo
 import { DayTrips } from '../components/DayTrips.tsx';
 import { useI18n, type Key } from '../i18n.ts';
 import { findOptions, firstDeparture, type Found } from '../lib/ahead.ts';
-import { aheadFrom, capitalise, dayAhead, longDate } from '../lib/format.ts';
+import { aheadFrom, capitalise, dayAhead, duration, longDate } from '../lib/format.ts';
 import { useGeolocation } from '../lib/geolocation.ts';
 import { decodePlace, encodePlace, walkItinerary } from '../lib/itinerary.ts';
 import { itineraryContent, travelContent, type MapContent } from '../lib/mapContent.ts';
@@ -31,13 +34,19 @@ import {
   hasPhoto,
   photo,
   reachable,
+  SCENIC_WALKS,
   tripsByLine,
   walkFromCentre,
   type Destination,
 } from '../lib/scenic.ts';
+import { endOf, startOf, useTrails } from '../lib/trails.ts';
 import { useNow } from '../lib/useNow.ts';
 import { planOptions, useApp, useNetwork } from '../state/app.tsx';
 
+/** A walk along the sea starting or ending this near a place (m) is a stroll from it. */
+const STROLL_NEAR = 900;
+/** And a trail starting or ending this near (m). */
+const TRAIL_NEAR = 700;
 /** How many ways there to list before "more in the planner". */
 const SHOWN = 3;
 /** Farther than this from Funchal (m), you are not on the island: the trip starts in its centre. */
@@ -55,6 +64,45 @@ export function DestinationView({ d, route }: { d: Destination; route: Route }) 
   const selected = q.get('i') !== null ? Number(q.get('i')) : undefined;
   const served = reachable(net, d);
   const walk = walkFromCentre(d);
+
+  // Where one can stroll from here: the walks along the sea and the trails that start or end
+  // by the place, with how long they are, how long they take and how much they climb.
+  const pace = useMemo(() => planOptions(settings), [settings]);
+  const strolls = useMemo(
+    () =>
+      SCENIC_WALKS.filter(
+        (w) => haversine(w.from, d) <= STROLL_NEAR || haversine(w.to, d) <= STROLL_NEAR,
+      ),
+    [d],
+  );
+  const [strollFacts, setStrollFacts] = useState<(Itinerary | null)[] | undefined>();
+  useEffect(() => {
+    if (strolls.length === 0) return;
+    let cancelled = false;
+    planner
+      .walks(strolls.map((w) => ({ from: w.from, to: w.to, date, time: 9 * 3600, options: pace })))
+      .then((r) => !cancelled && setStrollFacts(r))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [strolls, planner, pace, date]);
+  const allTrails = useTrails();
+  const trailsHere = useMemo(
+    () =>
+      (allTrails ?? [])
+        .map((tr) => ({
+          tr,
+          m: Math.min(haversine(startOf(tr), d), haversine(endOf(tr), d)),
+        }))
+        .filter((x) => x.m <= TRAIL_NEAR)
+        .sort((a, b) => a.m - b.m)
+        .slice(0, 2)
+        .map((x) => x.tr),
+    [allTrails, d],
+  );
+  const km = (m: number) =>
+    (m / 1000).toLocaleString(t.locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
   const setParams = useCallback(
     (patch: Record<string, string | undefined>) =>
@@ -271,6 +319,61 @@ export function DestinationView({ d, route }: { d: Destination; route: Route }) 
         <div className="destination__title">
           <span className="destination__tag">{t.t(`scenic.${d.id}.tag` as Key)}</span>
           <h2>{d.name}</h2>
+          {(strolls.length > 0 || trailsHere.length > 0) && (
+            <ul className="destination__strolls" aria-label={t.t('scenic.strollHere')}>
+              {strolls.map((w, i) => {
+                const it = strollFacts?.[i];
+                const leg = it?.legs[0];
+                return (
+                  <li key={`${w.from.name}>${w.to.name}`}>
+                    <a
+                      href={`#/plan?${new URLSearchParams({ from: encodePlace(w.from), to: encodePlace(w.to) })}`}
+                    >
+                      <Waves size={14} aria-hidden />
+                      <span>
+                        {w.from.name} → {w.to.name}
+                        {it && leg?.kind === 'walk' && (
+                          <span className="destination__facts">
+                            {t.t('scenic.km', { km: km(leg.distance) })} ·{' '}
+                            {t.t('walk.min', { m: Math.max(1, Math.round(it.duration / 60)) })}
+                            {(leg.up ?? 0) >= 10 && (
+                              <>
+                                {' '}
+                                · <TrendingUp size={12} aria-hidden />{' '}
+                                {t.t('walk.dist', { d: Math.round((leg.up ?? 0) / 10) * 10 })}
+                              </>
+                            )}
+                          </span>
+                        )}
+                      </span>
+                    </a>
+                  </li>
+                );
+              })}
+              {trailsHere.slice(0, Math.max(0, 3 - strolls.length)).map((tr) => (
+                <li key={tr.id}>
+                  <a href={`#/hikes/${tr.id}`}>
+                    <Mountain size={14} aria-hidden />
+                    <span>
+                      {tr.ref ? `${tr.ref} ` : ''}
+                      {tr.name}
+                      <span className="destination__facts">
+                        {t.t('scenic.km', { km: km(tr.length) })} ·{' '}
+                        {duration(t, trailMinutes(tr.length, tr.up, tr.down) * 60)}
+                        {tr.up >= 10 && (
+                          <>
+                            {' '}
+                            · <TrendingUp size={12} aria-hidden />{' '}
+                            {t.t('walk.dist', { d: Math.round(tr.up / 10) * 10 })}
+                          </>
+                        )}
+                      </span>
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         {served && (
           <button

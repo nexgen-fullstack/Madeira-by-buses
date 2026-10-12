@@ -109,7 +109,13 @@ function Screen() {
       );
     case 'hikes':
       return sub !== undefined ? (
-        <HikeView key={sub} id={sub} rev={route.query.get('rev')} add={route.query.get('add')} />
+        <HikeView
+          key={sub}
+          id={sub}
+          rev={route.query.get('rev')}
+          add={route.query.get('add')}
+          merge={route.query.get('merge') === '1'}
+        />
       ) : (
         <HikesView />
       );

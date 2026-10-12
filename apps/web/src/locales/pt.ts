@@ -516,4 +516,34 @@ export const pt: Dict = {
   'hike.startFrom': 'Começar em:',
   'hike.withAdded': 'Com os juntados: {km} km · ≈ {time}',
   'hike.open': 'Abrir o percurso «{name}»',
+  'live.coming': {
+    one: 'Autocarro {route} pelo horário: a {n} paragem da sua, chega às {t}',
+    other: 'Autocarro {route} pelo horário: a {n} paragens da sua, chega às {t}',
+  },
+  'live.terminus': 'O autocarro {route} ainda está na primeira paragem ({stop}), parte às {t}',
+  'live.here': 'Pelo horário, o autocarro {route} está agora na sua paragem',
+  'live.gone': 'Pelo horário, o autocarro {route} já passou pela sua paragem',
+  'live.leave': 'Dá tempo: saia até às {t}',
+  'live.late': 'Pode não dar tempo: devia ter saído às {t}',
+  'live.note': 'A posição do autocarro vem do horário, não do GPS dele',
+  'place.photo': 'Abrir a foto: {name}',
+  'scenic.strollHere': 'Passeios a partir daqui',
+  'hike.merged': 'Percurso combinado',
+  'hike.mergedNote':
+    'Um só percurso: {names}. Distância, tempo, altitudes, início e fim são do caminho todo.',
+  'hike.unmerge': 'Separar',
+  'hike.mergeAsk': 'Juntar os percursos?',
+  'hike.mergeMore': 'Juntar ao percurso combinado?',
+  'hike.mergeText':
+    '«{name}» e «{trail}» passam a ser um só percurso: distância, tempo, altitudes, sentido e autocarros contam para o caminho todo.',
+  'hike.mergeYes': 'Juntar os percursos',
+  'hike.mergeNo': 'Só mostrar',
+  'places.title': 'Locais',
+  'places.website': 'Site',
+  'scenic.faja-dos-padres.tag': 'Teleférico até à fajã',
+  'scenic.faja-dos-padres.text':
+    'A cabine desce uma falésia quase a pique até uma faixa de terra junto ao mar com bananeiras, mangueiras e vinha; em baixo, um restaurante e uma praia de calhau. A 10 minutos a pé dos autocarros da estrada na Quinta Grande.',
+  'scenic.penha-de-aguia.tag': 'A Penha d’Águia sobre o Faial',
+  'scenic.penha-de-aguia.text':
+    'Um enorme rochedo de 590 m sobre o mar e, a seus pés, a freguesia do Faial com a igreja e os socalcos. A melhor vista é da estrada acima da freguesia, junto à paragem.',
 };

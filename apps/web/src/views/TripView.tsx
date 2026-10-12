@@ -10,13 +10,16 @@ import {
   TriangleAlert,
   X,
 } from 'lucide-react';
-import { useMapContent } from '../components/mapContext.tsx';
+import { useMapBuses, useMapContent } from '../components/mapContext.tsx';
+import { ABOARD_GOLD, type LiveBus } from '../lib/liveBus.ts';
+import { useSnapped } from '../lib/snap.ts';
+import { useNow } from '../lib/useNow.ts';
 import { RouteBadge } from '../components/RouteBadge.tsx';
 import { useI18n } from '../i18n.ts';
 import { isNative } from '../lib/device.ts';
 import { clock } from '../lib/format.ts';
 import { encodePlace } from '../lib/itinerary.ts';
-import { hasView } from '@madeirabus/engine';
+import { cumulativeDistances, hasView, projectOnPolyline } from '@madeirabus/engine';
 import { WalkGuide } from '../components/WalkGuide.tsx';
 import {
   flagPoint,
@@ -36,7 +39,7 @@ import { routeColor } from '../lib/color.ts';
 /** The ride being followed (the following itself runs in state/trip.tsx). */
 export function TripView() {
   const t = useI18n();
-  const { net } = useNetwork();
+  const { net, planner } = useNetwork();
   const { trip, setTrip, settings } = useApp();
   const tracking = useTripTracking();
   const [driver, setDriver] = useState(false);
@@ -51,7 +54,37 @@ export function TripView() {
   } = tracking ?? {};
 
   const walk = tracking?.walk;
-  const position = tracking?.position;
+  const raw = tracking?.position;
+  // In the bus: you are in it, gold, where the bus is on its road.
+  const aboard =
+    phase === 'ride' &&
+    state !== undefined &&
+    (state.status === 'riding' || state.status === 'prepare' || state.status === 'next');
+  // On foot, on the way walked (when the fix is near it), else on the nearest pavement;
+  // never in the houses beside the street.
+  const placed = useSnapped(trip?.simulate ? undefined : raw, planner);
+  const position = useMemo(() => {
+    if (!raw || trip?.simulate) return raw;
+    if (walk && walk.path.length > 1) {
+      const hit = projectOnPolyline(walk.path, cumulativeDistances(walk.path), raw);
+      if (hit.offset <= Math.max(25, Math.min(raw.accuracy ?? 25, 45)))
+        return { ...raw, lat: hit.point.lat, lon: hit.point.lon };
+    }
+    return placed ?? raw;
+  }, [raw, placed, walk, trip?.simulate]);
+  // The bus to take, where its timetable has it while it is awaited; the bus you are in.
+  const clockNow = useNow(5_000);
+  const buses = useMemo<LiveBus[] | undefined>(() => {
+    if (!ride || phase !== 'ride' || !trip) return undefined;
+    const text = net.routes[ride.route]!.short;
+    const key = `${ride.pattern}:${ride.dayTrip}`;
+    if (aboard) return [{ key, ...state.position, color: ABOARD_GOLD, text, aboard: true }];
+    const at = net.busAt(ride.pattern, trip.date, ride.dayTrip, clockNow.time);
+    return at && at.pos <= ride.boardPos
+      ? [{ key, ...at.point, color: rideColor(rideIndex), text }]
+      : undefined;
+  }, [ride, phase, trip, net, aboard, state, clockNow, rideIndex]);
+  useMapBuses(buses);
   const content = useMemo<MapContent | undefined>(() => {
     // On foot: the walk from its start flag to its chequered one, and the walker on it.
     const walkLine = walk && {
@@ -85,7 +118,8 @@ export function TripView() {
           ),
         ]
       : [];
-    const me: MapPoint[] = position && !trip?.simulate ? [{ ...position, kind: 'user' }] : [];
+    const me: MapPoint[] =
+      position && !trip?.simulate && !aboard ? [{ ...position, kind: 'user' }] : [];
     if (walk && phase !== 'ride') {
       return {
         lines: [walkLine!],
@@ -96,7 +130,6 @@ export function TripView() {
       };
     }
     if (!setup || !ride) return undefined;
-    const color = routeColor(net.routes[ride.route]!);
     const last = setup.stops.length - 1;
     // Boarded at the start flag, left at the chequered one, on the bus's side of the road,
     // both in the colour the ride is drawn in with its number.
@@ -111,7 +144,6 @@ export function TripView() {
       if (i === 0 || i === last) return flagPoint(at, i === last, look, s.name, { label: s.name });
       return { lat: at.lat, lon: at.lon, kind: 'stop', color: '#14181F' };
     });
-    if (state) points.push({ ...state.position, kind: 'bus', color });
     // The ride in the colour it has on the route, alone on the map (with the walk to it
     // while the bus is awaited), and where the phone is.
     const lines: MapContent['lines'] = [
@@ -131,13 +163,13 @@ export function TripView() {
     setup,
     ride,
     net,
-    state,
     rideIndex,
     walk,
     position,
     phase,
     trip?.simulate,
     trip?.itinerary.legs,
+    aboard,
   ]);
   useMapContent(content);
 

@@ -513,4 +513,34 @@ export const en: Dict = {
   'hike.startFrom': 'Start from:',
   'hike.withAdded': 'With those added: {km} km · ≈ {time}',
   'hike.open': 'Open the trail “{name}”',
+  'live.coming': {
+    one: 'Bus {route} by the timetable: {n} stop from yours, there at {t}',
+    other: 'Bus {route} by the timetable: {n} stops from yours, there at {t}',
+  },
+  'live.terminus': 'Bus {route} is still at its first stop ({stop}), leaving at {t}',
+  'live.here': 'Bus {route} is at your stop now, by the timetable',
+  'live.gone': 'Bus {route} has passed your stop by the timetable',
+  'live.leave': 'You can make it: leave by {t}',
+  'live.late': 'You may be late: it was time to leave at {t}',
+  'live.note': 'Where the bus is comes from its timetable, not its GPS',
+  'place.photo': 'Open the photo: {name}',
+  'scenic.strollHere': 'Walks from here',
+  'hike.merged': 'Merged walk',
+  'hike.mergedNote':
+    'One walk: {names}. Length, time, heights, start and end are for the whole way.',
+  'hike.unmerge': 'Separate',
+  'hike.mergeAsk': 'Merge the walks?',
+  'hike.mergeMore': 'Add it to the merged walk?',
+  'hike.mergeText':
+    '“{name}” and “{trail}” become one walk: its length, time, heights, which way to walk it and the buses there are for the whole way.',
+  'hike.mergeYes': 'Merge the walks',
+  'hike.mergeNo': 'Just show it',
+  'places.title': 'Places',
+  'places.website': 'Website',
+  'scenic.faja-dos-padres.tag': 'A cable car down to the shore',
+  'scenic.faja-dos-padres.text':
+    'A cabin drops down an almost sheer cliff to a strip of land by the sea with bananas, mangoes and vines; a restaurant and a pebble beach below. A 10-minute walk from the buses on the road at Quinta Grande.',
+  'scenic.penha-de-aguia.tag': 'The Eagle Rock above Faial',
+  'scenic.penha-de-aguia.text':
+    'A huge rock 590 m high over the sea, the village of Faial with its church and terraces below it. The best view is from the road above the village, by the bus stop.',
 };

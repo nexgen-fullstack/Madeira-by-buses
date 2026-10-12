@@ -518,4 +518,34 @@ export const fr: Dict = {
   'hike.startFrom': 'Partir de :',
   'hike.withAdded': 'Avec les ajouts : {km} km · ≈ {time}',
   'hike.open': 'Ouvrir le sentier « {name} »',
+  'live.coming': {
+    one: 'Bus {route} selon l’horaire : à {n} arrêt du vôtre, là à {t}',
+    other: 'Bus {route} selon l’horaire : à {n} arrêts du vôtre, là à {t}',
+  },
+  'live.terminus': 'Le bus {route} est encore à son premier arrêt ({stop}), départ à {t}',
+  'live.here': 'Selon l’horaire, le bus {route} est à votre arrêt',
+  'live.gone': 'Selon l’horaire, le bus {route} est déjà passé à votre arrêt',
+  'live.leave': 'Vous avez le temps : partez avant {t}',
+  'live.late': 'Vous risquez d’être en retard : il fallait partir à {t}',
+  'live.note': 'La position du bus vient de l’horaire, pas de son GPS',
+  'place.photo': 'Ouvrir la photo : {name}',
+  'scenic.strollHere': 'Promenades d’ici',
+  'hike.merged': 'Itinéraire combiné',
+  'hike.mergedNote':
+    'Un seul itinéraire : {names}. Longueur, durée, altitudes, départ et arrivée valent pour tout le chemin.',
+  'hike.unmerge': 'Séparer',
+  'hike.mergeAsk': 'Combiner les itinéraires ?',
+  'hike.mergeMore': 'L’ajouter à l’itinéraire combiné ?',
+  'hike.mergeText':
+    '« {name} » et « {trail} » deviennent un seul itinéraire : longueur, durée, altitudes, sens et bus valent pour tout le chemin.',
+  'hike.mergeYes': 'Combiner',
+  'hike.mergeNo': 'Juste l’afficher',
+  'places.title': 'Lieux',
+  'places.website': 'Site web',
+  'scenic.faja-dos-padres.tag': 'Un téléphérique jusqu’au rivage',
+  'scenic.faja-dos-padres.text':
+    'Une cabine descend une falaise presque à pic jusqu’à une bande de terre au bord de la mer, avec bananiers, manguiers et vignes ; en bas, un restaurant et une plage de galets. À 10 minutes à pied des bus de la route à Quinta Grande.',
+  'scenic.penha-de-aguia.tag': 'Le rocher de l’Aigle au-dessus de Faial',
+  'scenic.penha-de-aguia.text':
+    'Un immense rocher de 590 m au-dessus de la mer et, à ses pieds, le village de Faial avec son église et ses terrasses. La plus belle vue : depuis la route au-dessus du village, près de l’arrêt.',
 };

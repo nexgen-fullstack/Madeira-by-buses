@@ -45,7 +45,7 @@ export interface Drive {
   seconds: number;
 }
 
-interface RoadHit {
+export interface RoadHit {
   edge: number;
   /** Index of the segment of the edge's shape the point is nearest, and how far along it (0–1). */
   seg: number;
@@ -96,9 +96,9 @@ export class RoadGraph {
     );
   }
 
-  /** The nearest place on a road a car may drive, within SNAP metres. */
-  private snap(p: LatLon): RoadHit | undefined {
-    const span = Math.ceil(SNAP / 111_000 / CELL) + 1;
+  /** The nearest place on a road a car may drive, within `max` metres. */
+  snap(p: LatLon, max = SNAP): RoadHit | undefined {
+    const span = Math.ceil(max / 111_000 / CELL) + 1;
     const cy = Math.floor(p.lat / CELL);
     const cx = Math.floor(p.lon / CELL);
     const kx = 111_320 * Math.cos((p.lat * Math.PI) / 180);
@@ -121,7 +121,7 @@ export class RoadGraph {
             const l2 = dx * dx + dy * dy;
             const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / l2));
             const offset = Math.hypot(ax + t * dx, ay + t * dy);
-            if (offset <= SNAP && (!best || offset < best.offset)) {
+            if (offset <= max && (!best || offset < best.offset)) {
               const point = { lat: a.lat + t * (b.lat - a.lat), lon: a.lon + t * (b.lon - a.lon) };
               best = { edge: e, seg: j - 1, t, point, offset };
             }

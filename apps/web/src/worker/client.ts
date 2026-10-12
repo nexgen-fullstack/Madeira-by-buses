@@ -71,6 +71,14 @@ export class PlannerClient {
     return this.call({ method: 'walks', requests });
   }
 
+  /**
+   * Where a fix of the phone's GPS is on the ways: on a pavement or path on foot, on the road
+   * at speed (m/s); null when no way is near enough.
+   */
+  snap(p: LatLon, accuracy: number, speed: number): Promise<LatLon | null> {
+    return this.call({ method: 'snap', p: { lat: p.lat, lon: p.lon }, accuracy, speed });
+  }
+
   /** Stops the worker; pending calls are rejected. */
   dispose(): void {
     this.worker.terminate();

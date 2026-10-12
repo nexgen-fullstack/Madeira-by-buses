@@ -62,6 +62,7 @@ const USAGE = `madeirabus-pipeline <command>
         [--walk <walk.bin>]          the walking network, copied next to the bundle (skipped if absent)
         [--trails <trails.json>]     the hiking trails, copied next to the bundle (skipped if absent)
         [--addresses <json>]         streets and house numbers, copied next to the bundle (skipped if absent)
+        [--pois <pois.json>]         hospitals, shops, cafés… for the map, copied next to the bundle (skipped if absent)
         [--areas <areas.json>]       the bounds of towns and villages: where a trip to one goes
         [--drive <drive.bin>]        the roads: every line is drawn along them, in its lane,
                                      and they are copied next to the bundle for driving
@@ -392,6 +393,14 @@ async function build(args: Args) {
     const target = join(dirname(out), 'trails.json');
     await writeFile(target, await readFile(trailsPath));
     console.log(`Trails copied to ${target}`);
+  }
+
+  // The places of everyday life too, as pois.json: the map's "Places" button.
+  const poisPath = flag(args, 'pois');
+  if (poisPath && existsSync(poisPath)) {
+    const target = join(dirname(out), 'pois.json');
+    await writeFile(target, await readFile(poisPath));
+    console.log(`Places of everyday life copied to ${target}`);
   }
 
   // The roads too, as drive.bin: the app drives a car along them, beside the buses.

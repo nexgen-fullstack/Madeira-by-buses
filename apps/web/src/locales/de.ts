@@ -520,4 +520,34 @@ export const de: Dict = {
   'hike.startFrom': 'Start bei:',
   'hike.withAdded': 'Mit den hinzugefügten: {km} km · ≈ {time}',
   'hike.open': 'Weg „{name}“ öffnen',
+  'live.coming': {
+    one: 'Bus {route} laut Fahrplan: {n} Haltestelle vor Ihrer, dort um {t}',
+    other: 'Bus {route} laut Fahrplan: {n} Haltestellen vor Ihrer, dort um {t}',
+  },
+  'live.terminus': 'Bus {route} steht noch an der Starthaltestelle ({stop}), Abfahrt {t}',
+  'live.here': 'Laut Fahrplan ist Bus {route} jetzt an Ihrer Haltestelle',
+  'live.gone': 'Laut Fahrplan ist Bus {route} schon an Ihrer Haltestelle vorbei',
+  'live.leave': 'Das klappt: brechen Sie bis {t} auf',
+  'live.late': 'Es könnte knapp werden: Aufbruch wäre um {t} gewesen',
+  'live.note': 'Die Position des Busses stammt aus dem Fahrplan, nicht von seinem GPS',
+  'place.photo': 'Foto öffnen: {name}',
+  'scenic.strollHere': 'Spaziergänge von hier',
+  'hike.merged': 'Zusammengelegte Tour',
+  'hike.mergedNote':
+    'Eine Tour: {names}. Länge, Zeit, Höhen, Start und Ziel gelten für den ganzen Weg.',
+  'hike.unmerge': 'Trennen',
+  'hike.mergeAsk': 'Touren zusammenlegen?',
+  'hike.mergeMore': 'Zur zusammengelegten Tour hinzufügen?',
+  'hike.mergeText':
+    '„{name}“ und „{trail}“ werden eine Tour: Länge, Zeit, Höhen, Richtung und Busse gelten für den ganzen Weg.',
+  'hike.mergeYes': 'Zusammenlegen',
+  'hike.mergeNo': 'Nur zeigen',
+  'places.title': 'Orte',
+  'places.website': 'Website',
+  'scenic.faja-dos-padres.tag': 'Seilbahn hinab ans Meer',
+  'scenic.faja-dos-padres.text':
+    'Eine Kabine fährt eine fast senkrechte Klippe hinab zu einem Landstreifen am Meer mit Bananen, Mangos und Reben; unten ein Restaurant und ein Kieselstrand. 10 Minuten zu Fuß von den Bussen an der Straße in Quinta Grande.',
+  'scenic.penha-de-aguia.tag': 'Der Adlerfelsen über Faial',
+  'scenic.penha-de-aguia.text':
+    'Ein gewaltiger, 590 m hoher Fels über dem Meer, darunter das Dorf Faial mit Kirche und Terrassen. Am schönsten ist der Blick von der Straße oberhalb des Dorfes, an der Bushaltestelle.',
 };

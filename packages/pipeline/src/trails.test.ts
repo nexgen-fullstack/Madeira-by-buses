@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { decodePolyline, haversine, trailMinutes } from '@madeirabus/engine';
-import { buildTrails, joinWays, kindOf, splitName, trailLinesOf } from './trails.ts';
+import {
+  buildTrails,
+  chainPieces,
+  FROM_WAYS,
+  joinWays,
+  kindOf,
+  splitName,
+  trailLinesOf,
+} from './trails.ts';
 
 const at = (dx: number, dy = 0) => ({ lat: 32.75 + dy * 1e-3, lon: -16.9 + dx * 1e-3 });
 
@@ -101,5 +109,53 @@ describe('the hiking trails', () => {
     expect(
       buildTrails([rel, ...[...road].map(([id, t]) => ({ type: 'way', id, tags: t }))]).trails,
     ).toEqual([]);
+  });
+});
+
+describe('a levada mapped as named ways only', () => {
+  const p = (lat: number, lon: number) => ({ lat, lon });
+  it('is one line, its pieces end to end either way round and across a tunnel', () => {
+    const a = [p(32.7, -16.8), p(32.7, -16.79)];
+    // Mapped the other way round, starting where the first ends.
+    const b = [p(32.7, -16.78), p(32.7, -16.79)];
+    // Past a tunnel of some 500 m.
+    const c = [p(32.7, -16.775), p(32.7, -16.77)];
+    const [line, ...rest] = chainPieces([c, a, b], 900);
+    expect(rest).toEqual([]);
+    expect(line![0]).toEqual(p(32.7, -16.8));
+    expect(line!.at(-1)).toEqual(p(32.7, -16.77));
+  });
+
+  it('keeps a piece too far off apart', () => {
+    const far = [p(32.8, -16.8), p(32.8, -16.79)];
+    expect(chainPieces([[p(32.7, -16.8), p(32.7, -16.79)], far], 900)).toHaveLength(2);
+  });
+
+  it('is a trail with a link to one of its ways', () => {
+    const way = (id: number, pts: [number, number][]) => ({
+      type: 'way',
+      ref: id,
+      role: '',
+      geometry: pts.map(([lat, lon]) => ({ lat, lon })),
+    });
+    const { trails } = buildTrails([
+      {
+        type: 'relation',
+        id: 7,
+        tags: { type: 'route', route: 'hiking', name: 'Levada do Teste', [FROM_WAYS]: 'yes' },
+        members: [
+          way(7, [
+            [32.7, -16.8],
+            [32.7, -16.79],
+          ]),
+          way(8, [
+            [32.7, -16.785],
+            [32.7, -16.77],
+          ]),
+        ],
+      },
+    ]);
+    expect(trails[0]).toMatchObject({ id: 'osm-7', osm: 7, osmType: 'way', kind: 'levada' });
+    expect(trails[0]!.lines).toHaveLength(1);
   });
 });

@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { compactPois, poiQuery } from './pois.mjs';
 
 const OUT = process.argv[2] ?? 'data/sources';
 const SEEDS = [
@@ -173,6 +174,31 @@ async function crawl() {
   return { pages: pages.length, pdfs: pdfRecords, errors };
 }
 
+/** Levadas walked a lot but mapped as named ways only, not as a hiking route (see trailsOfWays). */
+const EXTRA_TRAILS = ['Levada do Caniçal'];
+
+/**
+ * Routes made of the named ways of EXTRA_TRAILS, one for each name, as Overpass sends a
+ * route with its ways' shapes, and the ways with their tags (which of them are roads): the
+ * pipeline's `trails` takes them as it takes the mapped routes.
+ */
+function trailsOfWays(ways) {
+  const byName = new Map();
+  for (const w of ways) {
+    if (w.type !== 'way' || !w.tags?.name || !w.geometry) continue;
+    byName.set(w.tags.name, [...(byName.get(w.tags.name) ?? []), w]);
+  }
+  return [...byName].flatMap(([name, list]) => [
+    {
+      type: 'relation',
+      id: Math.min(...list.map((w) => w.id)),
+      tags: { type: 'route', route: 'hiking', name, 'madeirabus:from_ways': 'yes' },
+      members: list.map((w) => ({ type: 'way', ref: w.id, role: '', geometry: w.geometry })),
+    },
+    ...list.map((w) => ({ type: 'way', id: w.id, tags: w.tags })),
+  ]);
+}
+
 const OVERPASS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
@@ -329,7 +355,22 @@ async function osm() {
      way(r);
      out tags qt;`,
   );
+  // Well-walked levadas mapped only as named ways, with no route of their own: made routes of.
+  const extra = await overpass(
+    `[out:json][timeout:300];
+     way["highway"~"^(path|footway|track|steps)$"]["name"~"^(${EXTRA_TRAILS.join('|')})$"](${BBOX});
+     out geom tags qt;`,
+  ).catch(() => ({ elements: [] }));
+  trails.elements.push(...trailsOfWays(extra.elements ?? []));
   writeFileSync(join(dir, 'trails-osm.json'), JSON.stringify(trails));
+  // The places of everyday life for the map's "Places" button (see pois.mjs): kept as they are.
+  const pois = await overpass(poiQuery(BBOX));
+  const poiRows = compactPois(pois.elements ?? []);
+  if (poiRows.length > 0)
+    writeFileSync(
+      join(dir, 'pois.json'),
+      JSON.stringify({ generatedAt: pois.osm3s?.timestamp_osm_base, pois: poiRows }),
+    );
   const relations = routes.elements.filter((e) => e.type === 'relation');
   return {
     routeRelations: relations.filter((r) => r.tags?.type === 'route').length,
@@ -338,6 +379,7 @@ async function osm() {
     stops: stops.elements.length,
     places: places.elements.length,
     trails: trails.elements.length,
+    pois: poiRows.length,
   };
 }
 

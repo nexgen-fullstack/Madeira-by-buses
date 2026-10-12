@@ -199,3 +199,27 @@ describe('WalkGraph', () => {
     expect(g.route(xy(0, 0), xy(1000, 0))!.scenic).toBe(0);
   });
 });
+
+describe('where a walker is on the pavements', () => {
+  // A road 200 m east with its pavements 5 m either side of its middle, and a footway north.
+  const g = graph({
+    nodes: [xy(0, 0), xy(200, 0), xy(100, 0), xy(100, 60)],
+    edges: [
+      { from: 0, to: 1, kind: WALK_STREET + 50 * 4, points: [] },
+      { from: 2, to: 3, kind: WALK_STREET, points: [] },
+    ],
+  });
+  const y = (p: LatLon) => (p.lat - LAT0) * 110_574;
+  const x = (p: LatLon) => (p.lon - LON0) * 111_320 * Math.cos((LAT0 * Math.PI) / 180);
+
+  it('puts a fix in the houses on the pavement on its side of the road', () => {
+    expect(y(g.onPavement(xy(40, 18))!.point)).toBeCloseTo(5, 0);
+    expect(y(g.onPavement(xy(40, -18))!.point)).toBeCloseTo(-5, 0);
+    expect(x(g.onPavement(xy(40, -18))!.point)).toBeCloseTo(40, 0);
+  });
+
+  it('puts one by a footway on it, and none far from every way', () => {
+    expect(x(g.onPavement(xy(108, 45))!.point)).toBeCloseTo(100, 0);
+    expect(g.onPavement(xy(40, 80), 30)).toBeUndefined();
+  });
+});

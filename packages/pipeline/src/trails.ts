@@ -252,9 +252,9 @@ export function trailOf(
   const found = trailLinesOf(rel, wayTags);
   // Mostly roads, or roads cut most of it off: a royal road through the villages, not a trail.
   if (found.roads >= MOSTLY_ROADS || found.kept < 1 - MOSTLY_ROADS) return undefined;
-  const lines = found.lines
-    .map((l) => simplify(l, DETAIL))
-    .sort((x, y) => lengthOf(y) - lengthOf(x));
+  // Named ways, not a route: its pieces put end to end, across its tunnels.
+  const pieces = tags[FROM_WAYS] ? chainPieces(found.lines, TUNNEL) : found.lines;
+  const lines = pieces.map((l) => simplify(l, DETAIL)).sort((x, y) => lengthOf(y) - lengthOf(x));
   const length = Math.round(lines.reduce((m, l) => m + lengthOf(l), 0));
   if (lines.length === 0 || length < SHORTEST) return undefined;
   const main = lines[0]!;
@@ -291,6 +291,7 @@ export function trailOf(
     name,
     kind,
     osm: rel.id,
+    ...(tags[FROM_WAYS] ? { osmType: 'way' as const } : {}),
     length,
     up,
     down,
@@ -304,6 +305,42 @@ export function trailOf(
 }
 
 const round = (x: number) => Math.round(x * 1e5) / 1e5;
+
+/**
+ * The tag fetch-sources.mjs puts on a trail it makes of named ways that are not a route
+ * (Levada do Caniçal): its id is one of the ways'.
+ */
+export const FROM_WAYS = 'madeirabus:from_ways';
+
+/** The longest tunnel of a levada walked through or past (m): its pieces this far apart are one. */
+const TUNNEL = 900;
+
+/**
+ * A trail's pieces put end to end, either way round, from the longest, where an end of one
+ * is within `gap` metres of an end of the line so far; the pieces left over as they were.
+ */
+export function chainPieces(pieces: readonly LatLon[][], gap: number): LatLon[][] {
+  const rest = [...pieces].sort((a, b) => lengthOf(b) - lengthOf(a));
+  let chain = rest.shift();
+  if (!chain) return [];
+  for (;;) {
+    let best: { i: number; d: number; atEnd: boolean; flip: boolean } | undefined;
+    rest.forEach((p, i) => {
+      const ways = [
+        { d: haversine(chain!.at(-1)!, p[0]!), atEnd: true, flip: false },
+        { d: haversine(chain!.at(-1)!, p.at(-1)!), atEnd: true, flip: true },
+        { d: haversine(chain![0]!, p.at(-1)!), atEnd: false, flip: false },
+        { d: haversine(chain![0]!, p[0]!), atEnd: false, flip: true },
+      ];
+      for (const w of ways) if (w.d <= gap && (!best || w.d < best.d)) best = { i, ...w };
+    });
+    if (!best) break;
+    const p = rest.splice(best.i, 1)[0]!;
+    const q = best.flip ? [...p].reverse() : p;
+    chain = best.atEnd ? [...chain, ...q] : [...q, ...chain];
+  }
+  return [chain, ...rest];
+}
 
 const KIND_ORDER: Record<TrailKind, number> = { pr: 0, levada: 1, vereda: 2, other: 3 };
 

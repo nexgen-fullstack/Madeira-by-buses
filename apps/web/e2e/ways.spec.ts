@@ -99,6 +99,8 @@ test('another trail met is added to the walk and taken off again', async ({ page
   await expect(promenade).toContainText('Passeio Público Marítimo');
   await expect(promenade).toHaveAttribute('aria-pressed', 'false');
   await promenade.click();
+  // Asked first whether to merge the two into one walk: only shown here.
+  await page.getByRole('button', { name: 'Лише показати' }).click();
   await expect(page).toHaveURL(/add=osm-2223213\.0/);
   await expect(promenade).toHaveAttribute('aria-pressed', 'true');
   // The walk may now start at either trail's start, and is longer.
@@ -107,6 +109,22 @@ test('another trail met is added to the walk and taken off again', async ({ page
   await promenade.click();
   await expect(promenade).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('.hike__starts')).toHaveCount(0);
+});
+
+test('another trail met is merged with the trail into one walk', async ({ page }) => {
+  await page.goto('./#/hikes/osm-2232229?rev=1');
+  await raiseSheet(page);
+  const length = await page.locator('.hike__facts dd').first().innerText();
+  await page.locator('.hike-branch').first().click();
+  await expect(page.getByRole('dialog', { name: 'Об’єднати маршрути?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Об’єднати маршрути' }).click();
+  await expect(page).toHaveURL(/merge=1/);
+  await expect(page.locator('.hike__merged')).toBeVisible();
+  // One walk now: its length is the two trails' together, its start chips gone.
+  await expect(page.locator('.hike__facts dd').first()).not.toHaveText(length);
+  await expect(page.locator('.hike__starts')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Роз’єднати' }).click();
+  await expect(page).not.toHaveURL(/merge=1/);
 });
 
 test('where you are can be the end of a trip too', async ({ page }) => {

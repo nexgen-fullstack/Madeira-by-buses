@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
   ArrowLeftRight,
@@ -6,11 +7,14 @@ import {
   Camera,
   ExternalLink,
   Flag,
+  Merge,
   Minus,
   Navigation,
   Plus,
   Split,
   TriangleAlert,
+  Unlink,
+  X,
 } from 'lucide-react';
 import { haversine, trailMinutes, type LatLon, type Trail } from '@madeirabus/engine';
 import { useMapContent, useSpotlight } from '../components/mapContext.tsx';
@@ -32,6 +36,7 @@ import {
   endOf,
   JUNCTION,
   linesAt,
+  mergeWalk,
   nearbyTrails,
   nearestStop,
   reversedTrail,
@@ -147,16 +152,33 @@ function Hike({
   trail: asMapped,
   rev,
   add,
+  merge,
 }: {
   trail: Trail;
   rev: string | null;
   add: string | null;
+  merge: boolean;
 }) {
   const t = useI18n();
   const { net } = useNetwork();
-  // Walked as asked, or else from the end nearer to where the phone is.
+  // Walked as asked, or else from the end nearer to where the phone is (of the whole walk,
+  // with trails merged into it).
   const here = useQuietPosition();
-  const reversed = rev === null ? startsAtEnd(asMapped, here) : rev === '1';
+  const loadedTrails = useTrails();
+  const mergedAsMapped = useMemo(() => {
+    if (!merge || !loadedTrails || !add) return undefined;
+    const bs = trailBranches(asMapped, loadedTrails);
+    const ks = branchKeys(bs);
+    const on = new Set(add.split(','));
+    const chosen = bs.filter((_, i) => on.has(ks[i]!));
+    return chosen.length ? mergeWalk(asMapped, chosen) : undefined;
+  }, [merge, loadedTrails, add, asMapped]);
+  const reversed =
+    rev !== null
+      ? rev === '1'
+      : mergedAsMapped && here && !asMapped.roundtrip
+        ? haversine(here, mergedAsMapped.end.at) < haversine(here, mergedAsMapped.start.at)
+        : startsAtEnd(asMapped, here);
   const trail = useMemo(
     () => (reversed ? reversedTrail(asMapped) : asMapped),
     [asMapped, reversed],
@@ -185,38 +207,53 @@ function Hike({
   // The other trails added to the walk (a tap on one), kept in the address with the way.
   const keys = useMemo(() => branchKeys(branches), [branches]);
   const added = useMemo(() => new Set((add ?? '').split(',').filter(Boolean)), [add]);
-  const setAdded = (next: Set<string>) =>
+  const setAdded = (next: Set<string>, merged = merge) =>
     replaceRoute(`hikes/${asMapped.id}`, {
       rev: rev ?? undefined,
       add: [...next].join(','),
+      merge: merged && next.size > 0 ? '1' : undefined,
     });
-  const addedBranches = branches.filter((_, i) => added.has(keys[i]!));
+  const addedBranches = useMemo(
+    () => branches.filter((_, i) => added.has(keys[i]!)),
+    [branches, keys, added],
+  );
+  // The trails added merged with it into one walk: its facts, its ends, its way as one.
+  const merged = useMemo(
+    () => (merge && addedBranches.length > 0 ? mergeWalk(trail, addedBranches) : undefined),
+    [merge, trail, addedBranches],
+  );
   // Where the walk starts: the start nearest to the phone, or the one chosen.
   const ends = walkEnds(trail, addedBranches, here);
   const [startChosen, setStartChosen] = useState<number | undefined>();
-  const walkStart =
-    ends.starts[
-      startChosen !== undefined && startChosen < ends.starts.length ? startChosen : ends.start
-    ]!;
-  const walkEnd = ends.end;
-  // A tap on another trail adds it to the walk; a finger held on one added takes it off.
+  const walkStart = merged
+    ? merged.start
+    : ends.starts[
+        startChosen !== undefined && startChosen < ends.starts.length ? startChosen : ends.start
+      ]!;
+  const walkEnd = merged ? merged.end : ends.end;
+  // Another trail about to be added: whether to merge it with this one into one walk.
+  const [asking, setAsking] = useState<{ keys: string[]; name: string } | undefined>();
+  // A tap on another trail asks to add it to the walk; a tap or a finger held on one added
+  // takes it off.
   const onLine = (key: string, held: boolean) => {
     const b = branches[keys.indexOf(key)];
     if (!b) return undefined;
     const title = nameOf(b);
-    // A tap adds it, another takes it off again (as a finger held on it does).
-    const next = new Set(added);
-    if (added.has(key)) next.delete(key);
-    else if (held) return { title, lines: [t.t('hike.tapToAdd')] };
-    else next.add(key);
-    setAdded(next);
+    if (added.has(key)) {
+      const next = new Set(added);
+      next.delete(key);
+      setAdded(next);
+    } else if (held) return { title, lines: [t.t('hike.tapToAdd')] };
+    else setAsking({ keys: [key], name: b.trail.name });
     return undefined;
   };
 
   useMapContent(
     useMemo<MapContent>(() => {
       const lines = trailLines(trail);
-      const near = [start, ...(trail.roundtrip ? [] : [end])].flatMap((p) => {
+      const near = (
+        merged ? [merged.start.at, merged.end.at] : [start, ...(trail.roundtrip ? [] : [end])]
+      ).flatMap((p) => {
         const s = nearestStop(net, p);
         if (!s) return [];
         const st = net.stops[s.stop]!;
@@ -231,6 +268,65 @@ function Hike({
           },
         ] as MapPoint[];
       });
+      if (merged) {
+        // One walk: each of its stretches in its trail's colour with arrows the way it is
+        // walked, from one start flag to one chequered flag; the trails not added pale.
+        const pieceColor = (p: (typeof merged.pieces)[number]) =>
+          p.main ? TRAIL_RED : (colors.get(p.trail.id) ?? TRAIL_RED);
+        const mergedFlags = [
+          flagPoint(
+            merged.start.at,
+            false,
+            { mode: 'trail', color: pieceColor(merged.pieces[0]!) },
+            merged.start.trail.name,
+          ),
+          flagPoint(
+            merged.end.at,
+            true,
+            { mode: 'trail', color: pieceColor(merged.pieces.at(-1)!) },
+            merged.end.trail.name,
+          ),
+        ];
+        pairFlags(mergedFlags, ONE_JUNCTION);
+        return {
+          lines: [
+            ...branches.flatMap((b, i) =>
+              added.has(keys[i]!)
+                ? []
+                : [
+                    {
+                      coords: b.coords,
+                      color: colors.get(b.trail.id)!,
+                      width: 4,
+                      faint: true,
+                      key: keys[i]!,
+                    },
+                  ],
+            ),
+            ...merged.pieces.map((p) => {
+              // An added trail's stretch is taken off again by a tap, as before.
+              const k = p.main ? -1 : branches.findIndex((b) => b.trail === p.trail);
+              return {
+                coords: p.coords,
+                color: pieceColor(p),
+                width: 6,
+                arrows: true,
+                ...(k >= 0 ? { key: keys[k]! } : {}),
+              };
+            }),
+          ],
+          points: [...mergedFlags, ...near],
+          scenic: [
+            ...trailPhotoSpots(trail),
+            ...addedBranches.flatMap((b) => trailPhotoSpots(b.trail)),
+          ],
+          fitKey: `hike:${trail.id}:merged`,
+          fit: merged.pieces.flatMap((p) => p.coords),
+          focus: `hike:${trail.id}`,
+          onLine,
+          ...(nearby ? { trailIds: nearby } : {}),
+        };
+      }
       return {
         lines: [
           // Added to the walk: as wide as the trail, with its arrows; the others pale, not
@@ -270,7 +366,7 @@ function Hike({
         ...(nearby ? { trailIds: nearby } : {}),
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [trail, net, branches, colors, keys, added, nearby]),
+    }, [trail, net, branches, colors, keys, added, nearby, merged]),
   );
   // Each other trail met, once, as listed under the trail: walked the way it turns off.
   const met = [...colors].map(([id, color]) => {
@@ -287,7 +383,8 @@ function Hike({
   // The walk with the trails added to it: how long, how much time.
   const addedLength = addedBranches.reduce((m, b) => m + lengthOf(b.coords), 0);
 
-  const pic = trailPhoto(trail.id);
+  // Merged: the photo of the trail the walk starts on, when it has one.
+  const pic = (merged && trailPhoto(merged.start.trail.id)) || trailPhoto(trail.id);
   const views = trailViews(trail.id);
   const credits = [
     ...new Map(
@@ -296,15 +393,22 @@ function Hike({
   ];
   // A viewpoint tapped: shown on the map.
   const spot = useSpotlight();
-  const minutes = trailMinutes(trail.length, trail.up, trail.down);
-  const backSameWay = !trail.roundtrip && !nearestStop(net, end);
+  // The walk's facts: the trail's, or the merged walk's as one.
+  const walk = merged ?? trail;
+  const minutes = trailMinutes(walk.length, walk.up, walk.down);
+  const backSameWay = !trail.roundtrip && !nearestStop(net, walkEnd.at);
   const facts: [Key, string][] = [
-    ['hike.length', t.t('scenic.km', { km: trailKm(trail.length, t.locale) })],
+    ['hike.length', t.t('scenic.km', { km: trailKm(walk.length, t.locale) })],
     ['hike.time', duration(t, minutes * 60)],
-    ['hike.climb', t.t('travel.climb', { up: trail.up, down: trail.down })],
-    ['hike.height', t.t('hike.heights', { low: trail.low, high: trail.high })],
+    ['hike.climb', t.t('travel.climb', { up: walk.up, down: walk.down })],
+    ['hike.height', t.t('hike.heights', { low: walk.low, high: walk.high })],
   ];
-  const kind = (
+  const mergedNames = merged
+    ? [...new Set(merged.pieces.map((p) => p.trail.name))].join(' + ')
+    : undefined;
+  const kind = merged ? (
+    <>{t.t('hike.merged')}</>
+  ) : (
     <>
       {t.t(`hikes.kind.${trail.kind}` as Key)} ·{' '}
       {t.t(trail.roundtrip ? 'hike.loop' : 'hike.oneWay')}
@@ -335,7 +439,7 @@ function Hike({
           <div className="destination__title">
             <span className="destination__tag">{kind}</span>
             <h2>
-              <TrailBadge trail={trail} /> {trail.name}
+              <TrailBadge trail={trail} /> {mergedNames ?? trail.name}
             </h2>
           </div>
         </div>
@@ -351,7 +455,7 @@ function Hike({
           </button>
           <div className="line-hero__text">
             <h2 className="line-hero__name">
-              <TrailBadge trail={trail} /> {trail.name}
+              <TrailBadge trail={trail} /> {mergedNames ?? trail.name}
             </h2>
             <div className="line-hero__meta">{kind}</div>
           </div>
@@ -372,7 +476,7 @@ function Hike({
           <Bus size={16} aria-hidden /> {t.t('hike.byBus')}
         </h3>
         {/* With trails added, where the walk may start: the nearest one first chosen. */}
-        {ends.starts.length > 1 && (
+        {!merged && ends.starts.length > 1 && (
           <div className="chips hike__starts" role="group" aria-label={t.t('hike.startFrom')}>
             <span className="muted small">{t.t('hike.startFrom')}</span>
             {ends.starts.map((s, i) => (
@@ -388,7 +492,20 @@ function Hike({
             ))}
           </div>
         )}
-        {addedLength > 0 && (
+        {merged && (
+          <div className="hike__merged">
+            <Merge size={16} aria-hidden />
+            <span className="small">{t.t('hike.mergedNote', { names: mergedNames! })}</span>
+            <button
+              type="button"
+              className="button button--small"
+              onClick={() => setAdded(added, false)}
+            >
+              <Unlink size={14} aria-hidden /> {t.t('hike.unmerge')}
+            </button>
+          </div>
+        )}
+        {!merged && addedLength > 0 && (
           <p className="small">
             {t.t('hike.withAdded', {
               km: trailKm(trail.length + addedLength, t.locale),
@@ -400,7 +517,7 @@ function Hike({
           </p>
         )}
         <StopNear at={walkStart.at} label={t.t('hike.start')} />
-        {!trail.roundtrip && <StopNear at={walkEnd.at} label={t.t('hike.end')} />}
+        {(merged || !trail.roundtrip) && <StopNear at={walkEnd.at} label={t.t('hike.end')} />}
         {/* No bus at its end: back the same way, as most walk PR 8 or the 25 Fontes. */}
         {backSameWay && (
           <p className="small hike__back">
@@ -439,6 +556,7 @@ function Hike({
               replaceRoute(`hikes/${trail.id}`, {
                 rev: reversed ? '0' : '1',
                 add: add ?? undefined,
+                merge: merge ? '1' : undefined,
               })
             }
           >
@@ -463,11 +581,12 @@ function Hike({
                   className="hike-branch"
                   aria-pressed={m.on}
                   onClick={() => {
-                    const next = new Set(added);
-                    for (const k of m.keys) {
-                      if (m.on) next.delete(k);
-                      else next.add(k);
+                    if (!m.on) {
+                      setAsking({ keys: m.keys, name: m.trail.name });
+                      return;
                     }
+                    const next = new Set(added);
+                    for (const k of m.keys) next.delete(k);
                     setAdded(next);
                   }}
                 >
@@ -537,6 +656,59 @@ function Hike({
         </section>
       )}
 
+      {/* Over the whole screen, not inside the sheet it is asked from. */}
+      {asking &&
+        createPortal(
+          <div
+            className="confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t.t('hike.mergeAsk')}
+          >
+            <div className="confirm__card">
+              <button
+                type="button"
+                className="icon-button confirm__close"
+                aria-label={t.t('close')}
+                onClick={() => setAsking(undefined)}
+              >
+                <X size={18} />
+              </button>
+              <h3 className="confirm__title">
+                <Merge size={18} aria-hidden /> {t.t(merge ? 'hike.mergeMore' : 'hike.mergeAsk')}
+              </h3>
+              <p className="small">
+                {t.t('hike.mergeText', { name: asking.name, trail: trail.name })}
+              </p>
+              <div className="confirm__actions">
+                <button
+                  type="button"
+                  className="button button--primary"
+                  onClick={() => {
+                    setAdded(new Set([...added, ...asking.keys]), true);
+                    setAsking(undefined);
+                  }}
+                >
+                  <Merge size={16} aria-hidden /> {t.t('hike.mergeYes')}
+                </button>
+                {!merge && (
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={() => {
+                      setAdded(new Set([...added, ...asking.keys]), false);
+                      setAsking(undefined);
+                    }}
+                  >
+                    {t.t('hike.mergeNo')}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
       <div className="banner banner--warn hike__safety">
         <TriangleAlert size={18} aria-hidden />
         <div>
@@ -549,7 +721,7 @@ function Hike({
       <p className="muted small">
         {t.t('hike.timeNote')}{' '}
         <a
-          href={`https://www.openstreetmap.org/relation/${trail.osm}`}
+          href={`https://www.openstreetmap.org/${trail.osmType ?? 'relation'}/${trail.osm}`}
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -580,15 +752,17 @@ export function HikeView({
   id,
   rev = null,
   add = null,
+  merge = false,
 }: {
   id: string;
   rev?: string | null;
   add?: string | null;
+  merge?: boolean;
 }) {
   const t = useI18n();
   const trails = useTrails();
   const trail = trailById(trails, id);
   if (!trails) return <p className="muted">{t.t('loading')}</p>;
   if (!trail) return <p className="error">{t.t('hikes.none')}</p>;
-  return <Hike key={trail.id} trail={trail} rev={rev} add={add} />;
+  return <Hike key={trail.id} trail={trail} rev={rev} add={add} merge={merge} />;
 }

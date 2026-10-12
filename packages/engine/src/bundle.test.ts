@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildBundle, projectServices, type BService } from './bundle.ts';
 import { toCsv } from './csv.ts';
+import { haversine } from './geo.ts';
 import { SIGA_FARES_2026 } from './fares.ts';
 import { parseGtfs, type GtfsFiles } from './gtfs.ts';
 import { Network } from './network.ts';
@@ -257,5 +258,28 @@ describe('carrying a feed forward while another goes on', () => {
     const hf = bundle.services.find((s) => s.id === 'hf:WK')!;
     expect(hf.end).toBe('2027-02-01');
     expect(bundle.services.find((s) => s.id === 'siga:WK')!.end).toBe('2027-06-30');
+  });
+});
+
+describe('where a bus is by its timetable', () => {
+  const net = new Network(fixtureBundle());
+  const pattern = net.patterns.findIndex((p) => net.routes[p.route]!.short === '1');
+  const day = net.timetable(WEEKDAY).patterns[pattern]!;
+  const trip = 0;
+  const times = net.tripStops(pattern, WEEKDAY, trip);
+
+  it('waits at a stop, and goes on between two as the time between them goes', () => {
+    const first = times[0]!;
+    const second = times[1]!;
+    expect(net.busAt(pattern, WEEKDAY, trip, first.dep - 60)).toBeUndefined();
+    const atStart = net.busAt(pattern, WEEKDAY, trip, first.dep)!;
+    expect(atStart.pos).toBe(0);
+    expect(haversine(atStart.point, net.stops[first.stop]!)).toBeLessThan(80);
+    const half = net.busAt(pattern, WEEKDAY, trip, (first.dep + second.arr) / 2)!;
+    expect(half.pos).toBe(1);
+    const { stops } = net.stopPositions(pattern);
+    expect(half.along).toBeCloseTo((stops[0]! + stops[1]!) / 2, 0);
+    expect(net.busAt(pattern, WEEKDAY, trip, times.at(-1)!.arr + 1)).toBeUndefined();
+    expect(day.start.length).toBeGreaterThan(0);
   });
 });

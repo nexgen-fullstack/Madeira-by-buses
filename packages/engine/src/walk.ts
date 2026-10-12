@@ -577,6 +577,50 @@ export class WalkGraph {
     return best;
   }
 
+  /**
+   * Where someone walking at `p` (a fix of the phone's GPS) is on the ways: the nearest
+   * one within `max` metres, and along a road on its pavement on the side `p` is on (the
+   * kerb's distance from the road's middle), not in the carriageway nor in the houses.
+   */
+  onPavement(p: LatLon, max = 30): { point: LatLon; offset: number } | undefined {
+    const hit = this.snap(p, max);
+    if (!hit) return undefined;
+    const kerb = walkKerb(this.kind[hit.edge]!);
+    if (kerb <= 0) return { point: hit.point, offset: hit.offset };
+    // The step of the way the point met, and the side of it `p` is on.
+    const pts = this.points(hit.edge);
+    const kx = 111_320 * Math.cos(hit.point.lat * DEG);
+    const ky = 110_540;
+    let dir: [number, number] | undefined;
+    let nearest = Infinity;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1]!;
+      const b = pts[i]!;
+      const ax = (a.lon - hit.point.lon) * kx;
+      const ay = (a.lat - hit.point.lat) * ky;
+      const dx = (b.lon - a.lon) * kx;
+      const dy = (b.lat - a.lat) * ky;
+      const seg = Math.hypot(dx, dy);
+      if (seg < 1e-6) continue;
+      const t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / (seg * seg)));
+      const off = Math.hypot(ax + t * dx, ay + t * dy);
+      if (off < nearest) {
+        nearest = off;
+        dir = [dx / seg, dy / seg];
+      }
+    }
+    if (!dir) return { point: hit.point, offset: hit.offset };
+    // The right of a step heading (dx, dy) is (dy, -dx); right when `p` is on the line.
+    const px = (p.lon - hit.point.lon) * kx;
+    const py = (p.lat - hit.point.lat) * ky;
+    const side = px * dir[1] - py * dir[0] >= 0 ? 1 : -1;
+    const point = {
+      lat: hit.point.lat + (-dir[0] * side * kerb) / ky,
+      lon: hit.point.lon + (dir[1] * side * kerb) / kx,
+    };
+    return { point, offset: hit.offset };
+  }
+
   private factor(e: number): number {
     return this.profile.kind[walkWay(this.kind[e]!)] ?? 1;
   }

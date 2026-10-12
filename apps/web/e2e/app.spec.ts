@@ -14,7 +14,7 @@ test('plans a trip with transfers, fares and the last bus back', async ({ page }
   // The island on the whole screen, the planner in the sheet below it.
   await raiseSheet(page);
   await expect(page.getByText(/Демо-дані/)).toBeVisible();
-  await page.getByRole('button', { name: /Aeroporto da Madeira → Porto Moniz/ }).click();
+  await page.getByRole('button', { name: /→ Porto Moniz/ }).click();
 
   const best = page.locator('.it-card').first();
   await expect(best).toContainText('09:00 – 12:50');
@@ -33,7 +33,7 @@ test('the simulated ride warns before the stop and arrives', async ({ page }) =>
   await allowSimulation(page);
   await page.goto('./');
   await raiseSheet(page);
-  await page.getByRole('button', { name: /Mercado dos Lavradores → Monte/ }).click();
+  await page.getByRole('button', { name: /→ Monte/ }).click();
   await page.locator('.it-card').first().click();
   await raiseSheet(page);
   await page.getByRole('button', { name: 'Simulate' }).click();

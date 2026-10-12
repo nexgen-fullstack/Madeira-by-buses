@@ -356,6 +356,36 @@ export class Network {
   }
 
   /**
+   * Where a trip's bus is at `time` by its timetable, in its lane: at a stop while it waits
+   * there, between two as far along as the time between them has gone; with the index of
+   * the stop it is at or going to (`pos`). Undefined before it leaves its first stop and
+   * after it reaches its last.
+   */
+  busAt(
+    pattern: number,
+    date: string,
+    dayTrip: number,
+    time: number,
+  ): { point: LatLon; along: number; pos: number } | undefined {
+    const times = this.tripStops(pattern, date, dayTrip);
+    if (times.length < 2 || time < times[0]!.dep || time > times[times.length - 1]!.arr)
+      return undefined;
+    const { cum, stops } = this.stopPositions(pattern);
+    let pos = times.findIndex((s) => time <= s.dep);
+    if (pos < 0) pos = times.length - 1;
+    const here = times[pos]!;
+    let along = stops[pos]!;
+    if (pos > 0 && time < here.arr) {
+      const prev = times[pos - 1]!;
+      const share = Math.max(0, Math.min(1, (time - prev.dep) / Math.max(1, here.arr - prev.dep)));
+      along = stops[pos - 1]! + share * (stops[pos]! - stops[pos - 1]!);
+    }
+    const end = cum[cum.length - 1]!;
+    const lane = this.laneBetween(pattern, Math.min(along, end - 1), Math.min(along + 1, end));
+    return { point: lane[0] ?? this.shape(pattern)[0]!, along, pos };
+  }
+
+  /**
    * Accent-insensitive search over stop names, grouped by name and
    * municipality. A name matches when it contains the query, or when every
    * query word starts a word of the name in any order, ignoring linking words

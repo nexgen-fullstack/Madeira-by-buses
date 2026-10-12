@@ -19,15 +19,18 @@ test('speaks French', async ({ page }) => {
   await expect(page.getByRole('option', { name: /Aéroport de Madère/ })).toBeVisible();
 });
 
-test('remembers recent trips', async ({ page }) => {
+test('remembers recent trips', async ({ page, context }) => {
+  // Where the phone is is not remembered (it changes): a suggestion's own start is, when the
+  // phone cannot tell.
+  await context.clearPermissions();
   await page.goto('./');
   await raiseSheet(page);
-  await page.getByRole('button', { name: /Mercado dos Lavradores → Monte/ }).click();
+  await page.getByRole('button', { name: /→ Monte/ }).click();
   await expect(page.locator('.it-card').first()).toBeVisible();
   await page.goto('./#/plan');
   await raiseSheet(page);
   await expect(page.getByText('Нещодавні поїздки')).toBeVisible();
-  const chips = page.getByRole('button', { name: /Mercado dos Lavradores → Monte/ });
+  const chips = page.getByRole('button', { name: /→ Monte/ });
   await expect(chips).toHaveCount(2); // the recent one and the suggestion
   await chips.first().click();
   await expect(page.locator('.it-card').first()).toBeVisible();
@@ -54,7 +57,7 @@ test('saved stops show their departures nearby and in the search', async ({ page
 test('a ride survives closing the app', async ({ page }) => {
   await page.goto('./');
   await raiseSheet(page);
-  await page.getByRole('button', { name: /Mercado dos Lavradores → Monte/ }).click();
+  await page.getByRole('button', { name: /→ Monte/ }).click();
   await page.locator('.it-card').first().click();
   await raiseSheet(page);
   await page.getByRole('button', { name: 'Почати поїздку' }).click();
@@ -87,7 +90,7 @@ test("under a chosen route, each line's timetable as a picture with its buttons"
 }) => {
   await page.goto('./');
   await raiseSheet(page);
-  await page.getByRole('button', { name: /Mercado dos Lavradores → Monte/ }).click();
+  await page.getByRole('button', { name: /→ Monte/ }).click();
   await page.locator('.it-card').first().click();
   await raiseSheet(page);
   const sheets = page.locator('.detail__sheet');

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { LatLon } from '@madeirabus/engine';
+import type { LiveBus } from '../lib/liveBus.ts';
 import { EMPTY_CONTENT, type MapContent } from '../lib/mapContent.ts';
 
 /** The planner field waiting for a tap on the map. */
@@ -28,17 +29,22 @@ interface MapCtx {
   setPick: (field: PickField | undefined, area?: PickArea, start?: LatLon) => void;
   spotlight?: Spotlight;
   setSpotlight: (spot: Spotlight | undefined) => void;
+  /** The buses of the way shown, where they are now (moving on their own, without a new map). */
+  buses?: LiveBus[];
+  setBuses: (buses: LiveBus[] | undefined) => void;
 }
 export const MapContentContext = createContext<MapCtx>({
   content: EMPTY_CONTENT,
   setContent: () => {},
   setPick: () => {},
   setSpotlight: () => {},
+  setBuses: () => {},
 });
 
 export function MapProvider({ children }: { children: ReactNode }) {
   const [content, setContentState] = useState<MapContent>(EMPTY_CONTENT);
   const [spotlight, setSpotlight] = useState<Spotlight | undefined>();
+  const [buses, setBuses] = useState<LiveBus[] | undefined>();
   // Another screen's map: the stop tapped on the last one no longer stands out.
   const setContent = useCallback((c: MapContent) => {
     setContentState(c);
@@ -54,7 +60,18 @@ export function MapProvider({ children }: { children: ReactNode }) {
   }, []);
   return (
     <MapContentContext.Provider
-      value={{ content, setContent, pick, pickArea, pickStart, setPick, spotlight, setSpotlight }}
+      value={{
+        content,
+        setContent,
+        pick,
+        pickArea,
+        pickStart,
+        setPick,
+        spotlight,
+        setSpotlight,
+        buses,
+        setBuses,
+      }}
     >
       {children}
     </MapContentContext.Provider>
@@ -67,6 +84,13 @@ export function useMapContent(content: MapContent | undefined): void {
   useEffect(() => {
     if (content) setContent(content);
   }, [content, setContent]);
+}
+
+/** Puts these buses on the map while the calling screen is shown (none when it closes). */
+export function useMapBuses(buses: LiveBus[] | undefined): void {
+  const { setBuses } = useContext(MapContentContext);
+  useEffect(() => setBuses(buses), [buses, setBuses]);
+  useEffect(() => () => setBuses(undefined), [setBuses]);
 }
 
 /**

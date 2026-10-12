@@ -156,7 +156,7 @@ test('a chosen route is shown alone; the stops and lines come back with the list
   await button.click();
   await expect(button).toHaveAttribute('aria-pressed', 'true');
   await raiseSheet(page);
-  await page.getByRole('button', { name: /Mercado dos Lavradores → Monte/ }).click();
+  await page.getByRole('button', { name: /→ Monte/ }).click();
   await page.locator('.it-card').first().click();
   await expect(page).toHaveURL(/i=0/);
   await expect(button).toHaveAttribute('aria-pressed', 'false');
