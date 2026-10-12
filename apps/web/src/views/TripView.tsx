@@ -173,6 +173,13 @@ export function TripView() {
   ]);
   useMapContent(content);
 
+  // The way found anew misses the bus at its end: said, with a new search from here.
+  const lateBus = phase === 'transfer' ? nextRide : phase === 'ride' ? ride : undefined;
+  const late =
+    walk?.late && lateBus
+      ? t.t('guide.late', { route: net.routes[lateBus.route]!.short, t: clock(lateBus.start) })
+      : undefined;
+
   if (trip && tracking && phase === 'walk') {
     return (
       <div className="trip">
@@ -202,6 +209,7 @@ export function TripView() {
             position={position}
             to={walk.leg.to.name}
             speed={settings.walkSpeed}
+            rerouted={walk.rerouted}
           />
         )}
         {tracking.gpsError && <p className="muted small">{t.t('trip.gpsDenied')}</p>}
@@ -272,6 +280,25 @@ export function TripView() {
         </button>
       </div>
 
+      {late && (
+        <div className="banner banner--warn" role="alert">
+          <TriangleAlert size={16} aria-hidden />
+          <span>{late}</span>
+          <button
+            type="button"
+            className="button button--small"
+            onClick={() => {
+              // From where the phone is now (the planner's start by default) to the same end.
+              const last = trip.itinerary.legs[trip.itinerary.legs.length - 1]!;
+              const dest = last.kind === 'ride' ? { ...last.to, stops: [last.to.stop!] } : last.to;
+              navigate('plan', { to: encodePlace(dest, net), d: trip.date });
+            }}
+          >
+            {t.t('trip.replan')}
+          </button>
+        </div>
+      )}
+
       {phase === 'ride' && (
         <>
           {walk && (
@@ -280,6 +307,8 @@ export function TripView() {
               position={position}
               to={walk.leg.to.name}
               speed={settings.walkSpeed}
+              rerouted={walk.rerouted}
+              late={late}
             />
           )}
           <section className={`trip__status trip__status--${status}`} aria-live="assertive">
@@ -415,6 +444,8 @@ export function TripView() {
           position={position}
           to={walk.leg.to.name}
           speed={settings.walkSpeed}
+          rerouted={walk.rerouted}
+          late={late}
         />
       )}
 
@@ -424,6 +455,8 @@ export function TripView() {
           position={position}
           to={walk.leg.to.name}
           speed={settings.walkSpeed}
+          rerouted={walk.rerouted}
+          late={late}
         />
       )}
       {phase === 'done' && (

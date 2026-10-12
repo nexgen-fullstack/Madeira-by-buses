@@ -19,6 +19,8 @@ export interface Travel {
   /** Metres climbed and gone down on the way (on foot and by bike). */
   up?: number;
   down?: number;
+  /** On foot and by bike: for each step of `path`, how far the pavement is from the road's middle (m). */
+  kerb?: number[];
 }
 
 /**
@@ -47,5 +49,6 @@ export function travel(
     seconds: Math.round(way.cost / (bike ? BIKE_SPEED : ways.walkSpeed)),
     up: way.up,
     down: way.down,
+    kerb: way.kerb,
   };
 }

@@ -245,6 +245,12 @@ export function SettingsView() {
           </a>
         </p>
         <p className="muted small">© OpenStreetMap contributors · OpenFreeMap</p>
+        {/* Whose the places, the imagery, the weather and the webcams are, as their licences ask. */}
+        <p className="muted small">
+          Places: OpenStreetMap, Overture Maps Foundation (CDLA Permissive 2.0) · Imagery: Esri,
+          Maxar, Earthstar Geographics · Weather: Open-Meteo (CC BY 4.0), IPMA · Webcams: Portal
+          Netmadeira, Madeira-Web (YouTube)
+        </p>
       </section>
     </div>
   );

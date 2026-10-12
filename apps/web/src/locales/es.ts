@@ -466,6 +466,12 @@ export const es: Dict = {
   'guide.hints': 'Indicaciones por voz',
   'guide.title': 'A pie',
   'guide.start': 'Empezar a caminar',
+  'guide.rerouted': 'Nueva ruta calculada',
+  'guide.late': 'Puede que pierda el {route} de las {t}',
+  'layers.weather': 'El tiempo en Madeira',
+  'layers.webcams': 'Webcams en directo',
+  'tab.weather': 'Tiempo',
+  'tab.webcams': 'Webcams',
   'layers.scenic': 'Fotos de los paisajes',
   'hikes.title': 'Senderos y levadas',
   'hikes.intro':

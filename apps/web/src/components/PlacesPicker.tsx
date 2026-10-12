@@ -3,7 +3,14 @@ import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { X } from 'lucide-react';
 import { useI18n } from '../i18n.ts';
-import { POI_GROUPS, POI_LOOK, poiName, type PoiCategory } from '../lib/pois.ts';
+import {
+  BIG_STORE_COLOR,
+  POI_GROUPS,
+  POI_LOOK,
+  poiName,
+  type Poi,
+  type PoiCategory,
+} from '../lib/pois.ts';
 
 /**
  * The categories of places as a maps app lists them, by group (food and drink, things to do,
@@ -130,5 +137,39 @@ export async function poiImage(category: PoiCategory): Promise<ImageData | undef
   });
 }
 
-/** A category's dot's image name on the map. */
+/** A category's dot's image name on the map; a big supermarket's own. */
 export const poiImageId = (category: PoiCategory) => `mb-poi-${category}`;
+export const bigStoreImageId = (p: Pick<Poi, 'name'>) =>
+  /pingo doce/i.test(p.name) ? 'mb-poi-big-pingo' : 'mb-poi-big-continente';
+
+/** Image size of a big supermarket's sign on the map (twice the size of the screen). */
+const SIGN = 60;
+
+/**
+ * A big supermarket's sign for the map, larger than the other places' dots: a rounded square
+ * in the store's colour with its initials ("C", "PD"), ringed in white, so a Continente or a
+ * Pingo Doce is told at a glance among the little shops.
+ */
+export function bigStoreImage(pingo: boolean): ImageData | undefined {
+  const canvas = document.createElement('canvas');
+  canvas.width = SIGN;
+  canvas.height = SIGN;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return undefined;
+  const square = (inset: number, r: number) => {
+    ctx.beginPath();
+    ctx.roundRect(inset, inset, SIGN - inset * 2, SIGN - inset * 2, r);
+  };
+  square(1, 16);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  square(5, 12);
+  ctx.fillStyle = pingo ? BIG_STORE_COLOR.pingo : BIG_STORE_COLOR.continente;
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `800 ${pingo ? 22 : 30}px Inter, system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(pingo ? 'PD' : 'C', SIGN / 2, SIGN / 2 + 1);
+  return ctx.getImageData(0, 0, SIGN, SIGN);
+}

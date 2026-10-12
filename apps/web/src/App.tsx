@@ -44,6 +44,8 @@ import { RideView } from './views/RideView.tsx';
 import { SettingsView } from './views/SettingsView.tsx';
 import { StopView } from './views/StopView.tsx';
 import { TripView } from './views/TripView.tsx';
+import { WeatherView } from './views/WeatherView.tsx';
+import { WebcamsView } from './views/WebcamsView.tsx';
 
 const MapView = lazy(() => import('./components/MapView.tsx'));
 
@@ -125,6 +127,10 @@ function Screen() {
       return <SettingsView />;
     case 'trip':
       return <TripView />;
+    case 'weather':
+      return <WeatherView route={route} />;
+    case 'webcams':
+      return <WebcamsView route={route} />;
     default:
       return <PlanView route={route} />;
   }

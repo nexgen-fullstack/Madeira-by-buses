@@ -114,6 +114,24 @@ export interface MapContent {
   trailIds?: readonly string[];
   /** Where the buses shown run on the Via Rápida: a violet band under them, named. */
   expressways?: LatLon[][];
+  /** Little signs with a word or two: the weather in each part of the island, the webcams. */
+  badges?: MapBadge[];
+}
+
+/** A little sign on the map: the sky and warmth of a part of the island, a live webcam. */
+export interface MapBadge extends LatLon {
+  id: string;
+  kind: 'weather' | 'webcam';
+  /** What it says, large ("☀️ 23°"). */
+  text: string;
+  /** Under it, small ("Funchal"). */
+  sub?: string;
+  /** Chosen: drawn stronger. */
+  active?: boolean;
+  /** Live now (a webcam broadcasting). */
+  live?: boolean;
+  /** What a tap on it does. */
+  onTap?: () => void;
 }
 
 /** A place with a view on the map: its photo (or its region's colours) and its name. */

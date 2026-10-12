@@ -53,6 +53,13 @@ jobs:
         run: |
           pnpm data
           pnpm data:real || echo "::warning title=Real timetable unavailable::The app was built with the demo network only."
+      - name: Webcams live now
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: |
+          # Each camera's YouTube broadcast now; the last collected when YouTube does not answer.
+          cp data/sources/webcams.json apps/web/public/data/webcams.json || true
+          node scripts/webcams.mjs apps/web/public/data/webcams.json || true
 
       - name: Web app for the phone
         env:

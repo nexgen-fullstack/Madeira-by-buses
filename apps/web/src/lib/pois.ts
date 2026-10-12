@@ -1,10 +1,16 @@
 import {
   Banknote,
   BedDouble,
+  Building2,
   Car,
   CarTaxiFront,
+  Castle,
+  Church,
   Coffee,
+  Compass,
+  Drama,
   Droplets,
+  Dumbbell,
   Fuel,
   GlassWater,
   Hospital,
@@ -19,7 +25,9 @@ import {
   Shirt,
   ShoppingBag,
   ShoppingBasket,
+  ShoppingCart,
   SquareParking,
+  Stethoscope,
   Store,
   Toilet,
   Trees,
@@ -32,12 +40,15 @@ import {
 import type { Lang } from '../i18n.ts';
 
 /**
- * The places of everyday life on the map's "Places" button, as Google Maps groups them:
- * food and drink, things to do, shopping, services (data/pois.json, from OpenStreetMap by
- * scripts/pois.mjs: the categories there and here are the same).
+ * The places of everyday life, on the map's "Places" button as Google Maps groups them —
+ * food and drink, things to do, shopping, services — and along every street close in
+ * (data/pois.json: OpenStreetMap's by scripts/pois.mjs with those only Overture Maps knows,
+ * merged by the pipeline; the categories there and here are the same). `bigstore` is not a
+ * category of its own: the groceries that are a Continente or a Pingo Doce.
  */
 export type PoiCategory =
   | 'hospital'
+  | 'doctor'
   | 'pharmacy'
   | 'police'
   | 'hotel'
@@ -45,12 +56,19 @@ export type PoiCategory =
   | 'cafe'
   | 'bar'
   | 'grocery'
+  | 'bigstore'
   | 'mall'
   | 'shop'
+  | 'tour'
   | 'park'
   | 'beach'
+  | 'attraction'
   | 'museum'
+  | 'culture'
+  | 'church'
+  | 'gym'
   | 'library'
+  | 'government'
   | 'info'
   | 'rental'
   | 'fuel'
@@ -77,21 +95,46 @@ export interface Poi {
   hours?: string;
   phone?: string;
   web?: string;
+  /** A big supermarket (Continente, Pingo Doce): drawn larger, in its own colour, named. */
+  big?: boolean;
 }
+
+/** The big supermarkets' own colours, for their dots. */
+export const BIG_STORE_COLOR = { continente: '#E30613', pingo: '#2E8B3A' } as const;
+
+/** A big supermarket's colour by its name. */
+export const bigStoreColor = (name: string) =>
+  /pingo doce/i.test(name) ? BIG_STORE_COLOR.pingo : BIG_STORE_COLOR.continente;
 
 export type PoiGroup = 'food' | 'things' | 'shopping' | 'services';
 
 /** The groups and their categories, in the order the picker shows them. */
 export const POI_GROUPS: readonly [PoiGroup, readonly PoiCategory[]][] = [
   ['food', ['restaurant', 'cafe', 'bar']],
-  ['things', ['park', 'beach', 'museum', 'library', 'info']],
-  ['shopping', ['grocery', 'mall', 'shop', 'pharmacy']],
+  [
+    'things',
+    [
+      'attraction',
+      'museum',
+      'culture',
+      'park',
+      'beach',
+      'tour',
+      'gym',
+      'church',
+      'library',
+      'info',
+    ],
+  ],
+  ['shopping', ['bigstore', 'grocery', 'mall', 'shop', 'pharmacy']],
   [
     'services',
     [
       'hotel',
       'hospital',
+      'doctor',
       'police',
+      'government',
       'atm',
       'rental',
       'fuel',
@@ -116,16 +159,24 @@ export const POI_LOOK: Record<PoiCategory, { icon: LucideIcon; color: string }> 
   bar: { icon: Wine, color: '#E8710A' },
   park: { icon: Trees, color: '#188038' },
   beach: { icon: Umbrella, color: '#0B8DA8' },
-  museum: { icon: Landmark, color: '#188038' },
+  attraction: { icon: Castle, color: '#0F8C7E' },
+  museum: { icon: Landmark, color: '#0F8C7E' },
+  culture: { icon: Drama, color: '#0F8C7E' },
+  church: { icon: Church, color: '#6D6F73' },
+  gym: { icon: Dumbbell, color: '#188038' },
+  tour: { icon: Compass, color: '#0F8C7E' },
   library: { icon: Library, color: '#188038' },
   info: { icon: Info, color: '#188038' },
+  bigstore: { icon: ShoppingCart, color: BIG_STORE_COLOR.continente },
   grocery: { icon: ShoppingBasket, color: '#1A73E8' },
   mall: { icon: Store, color: '#1A73E8' },
   shop: { icon: ShoppingBag, color: '#1A73E8' },
   pharmacy: { icon: Pill, color: '#D93025' },
   hotel: { icon: BedDouble, color: '#C2185B' },
   hospital: { icon: Hospital, color: '#D93025' },
+  doctor: { icon: Stethoscope, color: '#D93025' },
   police: { icon: ShieldCheck, color: '#1F3A93' },
+  government: { icon: Building2, color: '#1F3A93' },
   atm: { icon: Banknote, color: '#5E35B1' },
   rental: { icon: Car, color: '#5E35B1' },
   fuel: { icon: Fuel, color: '#5E35B1' },
@@ -153,6 +204,14 @@ const LABELS: Record<PoiGroup | PoiCategory, Record<Lang, string>> = {
   bar: { uk: 'Бари', en: 'Bars', pt: 'Bares', es: 'Bares', fr: 'Bars', it: 'Bar', de: 'Bars', cs: 'Bary', pl: 'Bary', ru: 'Бары' },
   park: { uk: 'Парки й сади', en: 'Parks & gardens', pt: 'Parques e jardins', es: 'Parques y jardines', fr: 'Parcs et jardins', it: 'Parchi e giardini', de: 'Parks & Gärten', cs: 'Parky a zahrady', pl: 'Parki i ogrody', ru: 'Парки и сады' },
   beach: { uk: 'Пляжі й басейни', en: 'Beaches & pools', pt: 'Praias e piscinas', es: 'Playas y piscinas', fr: 'Plages et piscines', it: 'Spiagge e piscine', de: 'Strände & Bäder', cs: 'Pláže a koupaliště', pl: 'Plaże i kąpieliska', ru: 'Пляжи и бассейны' },
+  attraction: { uk: 'Пам’ятки', en: 'Sights', pt: 'Monumentos e atrações', es: 'Monumentos y atracciones', fr: 'Sites et monuments', it: 'Monumenti e attrazioni', de: 'Sehenswürdigkeiten', cs: 'Památky', pl: 'Zabytki i atrakcje', ru: 'Достопримечательности' },
+  culture: { uk: 'Театри, кіно й концерти', en: 'Theatres, cinemas & venues', pt: 'Teatros, cinemas e espetáculos', es: 'Teatros, cines y espectáculos', fr: 'Théâtres, cinémas et salles', it: 'Teatri, cinema e locali', de: 'Theater, Kinos & Bühnen', cs: 'Divadla, kina a koncerty', pl: 'Teatry, kina i koncerty', ru: 'Театры, кино и концерты' },
+  church: { uk: 'Церкви', en: 'Churches', pt: 'Igrejas', es: 'Iglesias', fr: 'Églises', it: 'Chiese', de: 'Kirchen', cs: 'Kostely', pl: 'Kościoły', ru: 'Церкви' },
+  gym: { uk: 'Спорт і фітнес', en: 'Sport & fitness', pt: 'Desporto e ginásios', es: 'Deporte y gimnasios', fr: 'Sport et fitness', it: 'Sport e palestre', de: 'Sport & Fitness', cs: 'Sport a fitness', pl: 'Sport i fitness', ru: 'Спорт и фитнес' },
+  tour: { uk: 'Екскурсії й тури', en: 'Tours & trips', pt: 'Passeios e excursões', es: 'Excursiones y tours', fr: 'Excursions et visites', it: 'Escursioni e tour', de: 'Touren & Ausflüge', cs: 'Výlety a zájezdy', pl: 'Wycieczki i rejsy', ru: 'Экскурсии и туры' },
+  government: { uk: 'Державні установи', en: 'Public offices', pt: 'Serviços públicos', es: 'Organismos públicos', fr: 'Services publics', it: 'Uffici pubblici', de: 'Behörden', cs: 'Úřady', pl: 'Urzędy', ru: 'Госучреждения' },
+  bigstore: { uk: 'Супермаркети Continente і Pingo Doce', en: 'Continente & Pingo Doce supermarkets', pt: 'Supermercados Continente e Pingo Doce', es: 'Supermercados Continente y Pingo Doce', fr: 'Supermarchés Continente et Pingo Doce', it: 'Supermercati Continente e Pingo Doce', de: 'Supermärkte Continente & Pingo Doce', cs: 'Supermarkety Continente a Pingo Doce', pl: 'Supermarkety Continente i Pingo Doce', ru: 'Супермаркеты Continente и Pingo Doce' },
+  doctor: { uk: 'Лікарі й стоматологи', en: 'Doctors & dentists', pt: 'Médicos e dentistas', es: 'Médicos y dentistas', fr: 'Médecins et dentistes', it: 'Medici e dentisti', de: 'Ärzte & Zahnärzte', cs: 'Lékaři a zubaři', pl: 'Lekarze i dentyści', ru: 'Врачи и стоматологи' },
   museum: { uk: 'Музеї', en: 'Museums', pt: 'Museus', es: 'Museos', fr: 'Musées', it: 'Musei', de: 'Museen', cs: 'Muzea', pl: 'Muzea', ru: 'Музеи' },
   library: { uk: 'Бібліотеки', en: 'Libraries', pt: 'Bibliotecas', es: 'Bibliotecas', fr: 'Bibliothèques', it: 'Biblioteche', de: 'Bibliotheken', cs: 'Knihovny', pl: 'Biblioteki', ru: 'Библиотеки' },
   info: { uk: 'Туристична інформація', en: 'Tourist information', pt: 'Posto de turismo', es: 'Información turística', fr: 'Office de tourisme', it: 'Informazioni turistiche', de: 'Touristinfo', cs: 'Turistické informace', pl: 'Informacja turystyczna', ru: 'Туристическая информация' },
@@ -171,7 +230,7 @@ const LABELS: Record<PoiGroup | PoiCategory, Record<Lang, string>> = {
   carwash: { uk: 'Автомийки', en: 'Car washes', pt: 'Lavagem de carros', es: 'Lavaderos de coches', fr: 'Lavage auto', it: 'Autolavaggi', de: 'Autowaschanlagen', cs: 'Myčky aut', pl: 'Myjnie', ru: 'Автомойки' },
   parking: { uk: 'Автостоянки', en: 'Car parks', pt: 'Parques de estacionamento', es: 'Aparcamientos', fr: 'Parkings', it: 'Parcheggi', de: 'Parkplätze', cs: 'Parkoviště', pl: 'Parkingi', ru: 'Автостоянки' },
   taxi: { uk: 'Стоянки таксі', en: 'Taxi ranks', pt: 'Praças de táxis', es: 'Paradas de taxi', fr: 'Stations de taxi', it: 'Posteggi taxi', de: 'Taxistände', cs: 'Stanoviště taxi', pl: 'Postoje taxi', ru: 'Стоянки такси' },
-  hair: { uk: 'Перукарні й салони краси', en: 'Hairdressers & beauty', pt: 'Cabeleireiros e estética', es: 'Peluquerías y estética', fr: 'Coiffeurs et beauté', it: 'Parrucchieri ed estetica', de: 'Friseure & Kosmetik', cs: 'Kadeřnictví a kosmetika', pl: 'Fryzjerzy i salony urody', ru: 'Парикмахерские и салоны' },
+  hair: { uk: 'Перукарні, краса й спа', en: 'Hair, beauty & spa', pt: 'Cabeleireiros, estética e spa', es: 'Peluquerías, estética y spa', fr: 'Coiffure, beauté et spa', it: 'Parrucchieri, estetica e spa', de: 'Friseure, Kosmetik & Spa', cs: 'Kadeřnictví, kosmetika a spa', pl: 'Fryzjerzy, uroda i spa', ru: 'Парикмахерские, красота и спа' },
   laundry: { uk: 'Пральні й хімчистки', en: 'Laundry & dry cleaning', pt: 'Lavandarias', es: 'Lavanderías', fr: 'Laveries et pressings', it: 'Lavanderie', de: 'Wäschereien & Reinigungen', cs: 'Prádelny a čistírny', pl: 'Pralnie', ru: 'Прачечные и химчистки' },
   post: { uk: 'Пошта', en: 'Post offices', pt: 'Correios', es: 'Correos', fr: 'Bureaux de poste', it: 'Uffici postali', de: 'Postämter', cs: 'Pošty', pl: 'Poczty', ru: 'Почта' },
   toilets: { uk: 'Туалети', en: 'Toilets', pt: 'Casas de banho', es: 'Aseos', fr: 'Toilettes', it: 'Bagni', de: 'Toiletten', cs: 'Toalety', pl: 'Toalety', ru: 'Туалеты' },
@@ -181,12 +240,48 @@ const LABELS: Record<PoiGroup | PoiCategory, Record<Lang, string>> = {
 /** A group's or category's name in the reader's language. */
 export const poiName = (id: PoiGroup | PoiCategory, lang: Lang) => LABELS[id][lang];
 
+/** The places of a category chosen on the "Places" button (the big stores: of the groceries). */
+export const ofCategory = (pois: readonly Poi[], c: PoiCategory) =>
+  c === 'bigstore' ? pois.filter((p) => p.big) : pois.filter((p) => p.category === c);
+
+/**
+ * How much a kind of place matters on a map seen close in, as Google Maps shows first the
+ * landmarks and big stores, then where to eat and shop, then everything else: lower first.
+ */
+export function poiRank(p: Poi): number {
+  if (p.big) return 0;
+  switch (p.category) {
+    case 'attraction':
+    case 'museum':
+    case 'hospital':
+    case 'mall':
+      return 1;
+    case 'restaurant':
+    case 'cafe':
+    case 'bar':
+    case 'hotel':
+    case 'grocery':
+    case 'pharmacy':
+    case 'church':
+    case 'culture':
+      return 2;
+    case 'parking':
+    case 'toilets':
+    case 'water':
+    case 'charging':
+    case 'taxi':
+      return 4;
+    default:
+      return 3;
+  }
+}
+
 type Row = [
   PoiCategory,
   string,
   number,
   number,
-  { k?: string; h?: string; p?: string; w?: string }?,
+  { k?: string; h?: string; p?: string; w?: string; b?: 1 }?,
 ];
 
 let loading: Promise<Poi[]> | undefined;
@@ -207,6 +302,7 @@ export function loadPois(): Promise<Poi[]> {
         hours: x?.h,
         phone: x?.p,
         web: x?.w,
+        ...(x?.b ? { big: true } : {}),
       }));
     } catch {
       loading = undefined;

@@ -500,6 +500,12 @@ export const uk = {
   'guide.hints': 'Голосові підказки',
   'guide.title': 'Пішки',
   'guide.start': 'Почати піший маршрут',
+  'guide.rerouted': 'Маршрут перебудовано',
+  'guide.late': 'Можна не встигнути на {route} о {t}',
+  'layers.weather': 'Погода на Мадейрі',
+  'layers.webcams': 'Камери онлайн',
+  'tab.weather': 'Погода',
+  'tab.webcams': 'Камери',
   'layers.scenic': 'Фото краєвидів',
   'hikes.title': 'Піші стежки й левади',
   'hikes.intro':

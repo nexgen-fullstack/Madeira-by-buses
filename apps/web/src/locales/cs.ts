@@ -497,6 +497,12 @@ export const cs: Dict = {
   'guide.hints': 'Hlasové pokyny',
   'guide.title': 'Pěšky',
   'guide.start': 'Vyrazit pěšky',
+  'guide.rerouted': 'Trasa přepočítána',
+  'guide.late': 'Možná nestihnete {route} v {t}',
+  'layers.weather': 'Počasí na Madeiře',
+  'layers.webcams': 'Webkamery živě',
+  'tab.weather': 'Počasí',
+  'tab.webcams': 'Kamery',
   'layers.scenic': 'Fotky vyhlídek',
   'hikes.title': 'Turistické stezky a levády',
   'hikes.intro':

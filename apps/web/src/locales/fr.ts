@@ -470,6 +470,12 @@ export const fr: Dict = {
   'guide.hints': 'Guidage vocal',
   'guide.title': 'À pied',
   'guide.start': 'Commencer à marcher',
+  'guide.rerouted': 'Nouvel itinéraire',
+  'guide.late': 'Vous risquez de manquer le {route} de {t}',
+  'layers.weather': 'Météo à Madère',
+  'layers.webcams': 'Webcams en direct',
+  'tab.weather': 'Météo',
+  'tab.webcams': 'Webcams',
   'layers.scenic': 'Photos des paysages',
   'hikes.title': 'Sentiers et levadas',
   'hikes.intro':

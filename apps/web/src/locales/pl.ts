@@ -500,6 +500,12 @@ export const pl: Dict = {
   'guide.hints': 'Wskazówki głosowe',
   'guide.title': 'Pieszo',
   'guide.start': 'Zacznij iść',
+  'guide.rerouted': 'Wyznaczono nową trasę',
+  'guide.late': 'Możesz nie zdążyć na {route} o {t}',
+  'layers.weather': 'Pogoda na Maderze',
+  'layers.webcams': 'Kamery na żywo',
+  'tab.weather': 'Pogoda',
+  'tab.webcams': 'Kamery',
   'layers.scenic': 'Zdjęcia widoków',
   'hikes.title': 'Szlaki piesze i lewady',
   'hikes.intro':

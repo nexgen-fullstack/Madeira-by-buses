@@ -1859,6 +1859,17 @@ input[type='time'],
   color: #14181f;
   background: var(--accent);
 }
+/* A way found anew from where the walker turned off, as a maps app says it. */
+.walk-guide__new {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgb(255 255 255 / 16%);
+}
 .trip__status {
   border-radius: 18px;
   padding: 16px;
@@ -4097,4 +4108,400 @@ input[type='time'],
   align-items: center;
   gap: 4px;
   color: var(--brand);
+}
+
+/* ---------- Weather and webcams ---------- */
+
+/* More buttons than fit a narrow phone's top: the rest go on a second row. */
+.map-tools {
+  flex-wrap: wrap;
+  max-width: calc(100% - 76px);
+}
+/* The weather button: the sky and the warmth in Funchal now, its ring the colour of the worst
+   official warning. */
+.map-tool__weather {
+  display: grid;
+  justify-items: center;
+  line-height: 1;
+  gap: 1px;
+  font-size: 15px;
+}
+.map-tool__weather span:last-child {
+  font-size: 10px;
+  font-weight: 800;
+}
+.map-tool--warn-yellow {
+  box-shadow:
+    inset 0 0 0 2.5px #f4c20d,
+    0 2px 10px rgb(0 0 0 / 22%);
+}
+.map-tool--warn-orange {
+  box-shadow:
+    inset 0 0 0 2.5px #f57c00,
+    0 2px 10px rgb(0 0 0 / 22%);
+}
+.map-tool--warn-red {
+  box-shadow:
+    inset 0 0 0 2.5px #d93025,
+    0 2px 10px rgb(0 0 0 / 22%);
+}
+
+/* A little sign on the map: the weather of a part of the island, a webcam. */
+.map-badge {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.map-badge__text {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fff;
+  color: #14181f;
+  font: 800 13px/1.2 var(--font);
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 30%);
+}
+.map-badge__sub {
+  display: none;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 85%);
+  color: #14181f;
+  font: 700 10px/1.2 var(--font);
+  white-space: nowrap;
+}
+.map-badge--named .map-badge__sub,
+.map-badge--active .map-badge__sub {
+  display: block;
+}
+.map-badge--active .map-badge__text {
+  color: #fff;
+  background: var(--navy);
+  outline: 2px solid #fff;
+}
+.map-badge--webcam .map-badge__text {
+  padding: 3px 6px;
+  font-size: 14px;
+  opacity: 0.75;
+}
+.map-badge--webcam.map-badge--live .map-badge__text {
+  opacity: 1;
+  outline: 2px solid #d93025;
+}
+
+.weather,
+.webcams {
+  display: grid;
+  /* As wide as the sheet, whatever scrolls sideways inside (the hours). */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+.weather__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 20px;
+}
+.weather__source {
+  margin: 0;
+}
+.weather__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.weather-ok {
+  margin: 0;
+  color: var(--ok);
+  font-weight: 700;
+}
+.weather-warnings {
+  display: grid;
+  gap: 8px;
+}
+.weather-warning {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  color: #14181f;
+}
+.weather-warning svg {
+  flex: none;
+  margin-top: 2px;
+}
+.weather-warning--yellow {
+  background: #fff1a8;
+}
+.weather-warning--orange {
+  background: #ffc887;
+}
+.weather-warning--red {
+  color: #fff;
+  background: #d93025;
+}
+.weather-now,
+.weather-card {
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.weather-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.weather-now__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.weather-now__sign {
+  font-size: 54px;
+  line-height: 1;
+}
+.weather-now__temp {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+}
+.weather-now__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.weather-fact {
+  display: flex;
+  gap: 8px;
+}
+.weather-fact > svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--brand);
+}
+.weather-fact__value {
+  font-weight: 700;
+}
+.weather-fact__inline {
+  margin: 0 4px 0 8px;
+  vertical-align: -2px;
+}
+.weather-hours {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x proximity;
+}
+.weather-hour {
+  flex: none;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 52px;
+  padding: 6px 2px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  scroll-snap-align: start;
+}
+.weather-hour__sign {
+  font-size: 22px;
+}
+.weather-hour__rain {
+  min-height: 16px;
+  color: var(--brand);
+  font-weight: 700;
+}
+.weather-days {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.weather-days li {
+  display: grid;
+  grid-template-columns: 44px 26px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.weather-days li:last-child {
+  border-bottom: 0;
+}
+.weather-days__day {
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.weather-days__rain {
+  color: var(--brand);
+  font-weight: 700;
+}
+.weather-days__temp {
+  min-width: 64px;
+  text-align: right;
+}
+.weather-places {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+.weather-place {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.weather-place[aria-pressed='true'] {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+.weather-place__name {
+  flex: 1;
+  font-size: 13px;
+}
+.weather-sea {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.banner--weather {
+  align-items: center;
+  color: #14181f;
+}
+.banner--weather-yellow {
+  background: #fff1a8;
+}
+.banner--weather-orange {
+  background: #ffc887;
+}
+.banner--weather-red {
+  color: #fff;
+  background: #d93025;
+}
+.banner__link,
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.link-button {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.webcam-player {
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+  box-shadow: var(--shadow);
+}
+.webcam-player__frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+}
+.webcam-player__frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.webcam-player__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--surface);
+}
+.webcam-player__bar > div {
+  flex: 1;
+}
+.webcam-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.webcam-item {
+  display: grid;
+  width: 100%;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  cursor: pointer;
+}
+.webcam-item[aria-pressed='true'] {
+  border-color: var(--brand);
+}
+.webcam-item__still {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.webcam-item__still img {
+  /* Out of the flow: YouTube's 4:3 still keeps the 16:9 box as it is. */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.webcam-item__live {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #d93025;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+}
+.webcam-item__text {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+}
+.webcam-item__text .strong {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }

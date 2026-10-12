@@ -62,6 +62,14 @@ jobs:
             # Without the real timetable the site still works on the demo network.
             pnpm data:real || echo "::warning title=Real timetable unavailable::Published with the demo network only; see the log above."
           fi
+      - name: Webcams live now
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: |
+          # Each camera's YouTube broadcast now (every night with the timetable); the last
+          # collected when YouTube does not answer. The phone app reads it from the site.
+          cp data/sources/webcams.json apps/web/public/data/webcams.json || true
+          node scripts/webcams.mjs apps/web/public/data/webcams.json || true
       - run: pnpm --filter @madeirabus/web build
 
       - name: Publish to the gh-pages branch

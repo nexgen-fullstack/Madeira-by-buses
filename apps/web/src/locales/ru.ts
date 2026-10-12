@@ -496,6 +496,12 @@ export const ru: Dict = {
   'guide.hints': 'Голосовые подсказки',
   'guide.title': 'Пешком',
   'guide.start': 'Начать пеший маршрут',
+  'guide.rerouted': 'Маршрут перестроен',
+  'guide.late': 'Можно не успеть на {route} в {t}',
+  'layers.weather': 'Погода на Мадейре',
+  'layers.webcams': 'Камеры онлайн',
+  'tab.weather': 'Погода',
+  'tab.webcams': 'Камеры',
   'layers.scenic': 'Фото видов',
   'hikes.title': 'Пешие тропы и левады',
   'hikes.intro':

@@ -45,6 +45,8 @@ import { driveKind, reverseDriveKind } from './drive.ts';
 import { RoadRouter } from './shapes.ts';
 import { checkShapes, offRoadMarkdown } from './checkShapes.ts';
 import { buildTrails, type OsmRelation } from './trails.ts';
+import { mergePois, type OvertureFile, type PoiRow } from './pois.ts';
+import { placeStopsBySide, type OsmStopNode } from './stopSides.ts';
 import { AGENCIES, buildTimetableFeed } from './timetables/build.ts';
 import { loadLocalities, loadSiga, loadTimetables } from './timetables/load.ts';
 import { timetableReportMarkdown } from './timetables/report.ts';
@@ -63,6 +65,9 @@ const USAGE = `madeirabus-pipeline <command>
         [--trails <trails.json>]     the hiking trails, copied next to the bundle (skipped if absent)
         [--addresses <json>]         streets and house numbers, copied next to the bundle (skipped if absent)
         [--pois <pois.json>]         hospitals, shops, cafés… for the map, copied next to the bundle (skipped if absent)
+        [--overture <places.json>]   with --pois: the places only Overture Maps knows, added to them
+        [--stop-poles <bus-stops.json>]  with --walk: every stop put on the pavement on its buses'
+                                     side of the road, at its pole where OpenStreetMap has one
         [--areas <areas.json>]       the bounds of towns and villages: where a trip to one goes
         [--drive <drive.bin>]        the roads: every line is drawn along them, in its lane,
                                      and they are copied next to the bundle for driving
@@ -290,6 +295,20 @@ async function build(args: Args) {
         `${s.matched} drawn lines put on the roads, ${s.kept} left as drawn`,
     );
   }
+  // Every stop on the pavement on the right of its buses, not in the middle of the road.
+  const polesPath = flag(args, 'stop-poles');
+  const sidesWalk = flag(args, 'walk');
+  if (polesPath && existsSync(polesPath) && !bundle.demo) {
+    const poles = (JSON.parse(await readFile(polesPath, 'utf8')) as { elements?: OsmStopNode[] })
+      .elements;
+    const walk =
+      sidesWalk && existsSync(sidesWalk) ? WalkGraph.decode(await readFile(sidesWalk)) : undefined;
+    const s = placeStopsBySide(bundle, walk, poles ?? []);
+    console.log(
+      `Stops on their side of the road: ${s.right} were, ${s.osm} moved to their pole, ` +
+        `${s.pavement} to the pavement, ${s.kept} served both ways or off the road left as they were`,
+    );
+  }
   if (bundle.projected) {
     console.log(
       `! Official timetable ended ${bundle.projected.officialUntil}; ` +
@@ -395,12 +414,35 @@ async function build(args: Args) {
     console.log(`Trails copied to ${target}`);
   }
 
-  // The places of everyday life too, as pois.json: the map's "Places" button.
+  // The places of everyday life too, as pois.json: the map's "Places" button and the shops
+  // and cafés along every street, with those only Overture Maps knows.
   const poisPath = flag(args, 'pois');
   if (poisPath && existsSync(poisPath)) {
     const target = join(dirname(out), 'pois.json');
-    await writeFile(target, await readFile(poisPath));
-    console.log(`Places of everyday life copied to ${target}`);
+    const overturePath = flag(args, 'overture');
+    if (overturePath && existsSync(overturePath)) {
+      const osm = JSON.parse(await readFile(poisPath, 'utf8')) as {
+        generatedAt?: string;
+        pois: PoiRow[];
+      };
+      const overture = JSON.parse(await readFile(overturePath, 'utf8')) as OvertureFile;
+      const merged = mergePois(osm.pois, overture.places);
+      await writeText(
+        target,
+        JSON.stringify({
+          generatedAt: osm.generatedAt,
+          overture: overture.release,
+          pois: merged.pois,
+        }),
+      );
+      console.log(
+        `Places of everyday life written to ${target}: ${merged.osm} from OpenStreetMap, ` +
+          `${merged.overture} more from Overture ${overture.release} (${merged.matched} known to both)`,
+      );
+    } else {
+      await writeFile(target, await readFile(poisPath));
+      console.log(`Places of everyday life copied to ${target}`);
+    }
   }
 
   // The roads too, as drive.bin: the app drives a car along them, beside the buses.

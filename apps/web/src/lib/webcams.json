@@ -1,0 +1,265 @@
+[
+  {
+    "id": "pico-do-arieiro",
+    "name": "Pico do Arieiro",
+    "lat": 32.7356,
+    "lon": -16.9286,
+    "provider": "netmadeira",
+    "match": ["arieiro"],
+    "high": true
+  },
+  {
+    "id": "achada-do-teixeira",
+    "name": "Achada do Teixeira",
+    "lat": 32.7647,
+    "lon": -16.9053,
+    "provider": "netmadeira",
+    "match": ["teixeira"],
+    "high": true
+  },
+  {
+    "id": "eira-do-serrado",
+    "name": "Eira do Serrado",
+    "lat": 32.7107,
+    "lon": -16.9603,
+    "provider": "netmadeira",
+    "match": ["serrado"],
+    "high": true
+  },
+  {
+    "id": "rabacal-madeira",
+    "name": "Rabaçal",
+    "lat": 32.754,
+    "lon": -17.132,
+    "provider": "netmadeira",
+    "match": ["rabacal"],
+    "high": true
+  },
+  {
+    "id": "portela-porto-da-cruz",
+    "name": "Portela",
+    "lat": 32.746,
+    "lon": -16.826,
+    "provider": "netmadeira",
+    "match": ["portela"],
+    "high": true
+  },
+  {
+    "id": "santo-da-serra-golf",
+    "name": "Santo da Serra",
+    "lat": 32.727,
+    "lon": -16.816,
+    "provider": "netmadeira",
+    "match": ["santo da serra"],
+    "high": true
+  },
+  {
+    "id": "monte",
+    "name": "Monte",
+    "lat": 32.6762,
+    "lon": -16.903,
+    "provider": "netmadeira",
+    "match": ["monte"]
+  },
+  {
+    "id": "funchal-pontinha",
+    "name": "Funchal — Pontinha",
+    "lat": 32.6408,
+    "lon": -16.9137,
+    "provider": "netmadeira",
+    "match": ["pontinha"]
+  },
+  {
+    "id": "funchal-baia-do-funchal",
+    "name": "Funchal — Baía",
+    "lat": 32.644,
+    "lon": -16.911,
+    "provider": "netmadeira",
+    "match": ["baia do funchal"]
+  },
+  {
+    "id": "funchal-lido",
+    "name": "Funchal — Lido",
+    "lat": 32.6352,
+    "lon": -16.9333,
+    "provider": "netmadeira",
+    "match": ["lido"]
+  },
+  {
+    "id": "funchal-parque-ecologico",
+    "name": "Parque Ecológico do Funchal",
+    "lat": 32.696,
+    "lon": -16.902,
+    "provider": "netmadeira",
+    "match": ["ecologico"],
+    "high": true
+  },
+  {
+    "id": "palheiro-golf",
+    "name": "Palheiro Golf",
+    "lat": 32.662,
+    "lon": -16.868,
+    "provider": "netmadeira",
+    "match": ["palheiro"]
+  },
+  {
+    "id": "camara-de-lobos",
+    "name": "Câmara de Lobos",
+    "lat": 32.6489,
+    "lon": -16.9774,
+    "provider": "netmadeira",
+    "match": ["camara de lobos"]
+  },
+  {
+    "id": "camara-de-lobos-baia",
+    "name": "Câmara de Lobos — Baía",
+    "lat": 32.6477,
+    "lon": -16.9752,
+    "provider": "netmadeira",
+    "match": ["camara de lobos baia"]
+  },
+  {
+    "id": "praia-do-vigario",
+    "name": "Praia do Vigário",
+    "lat": 32.645,
+    "lon": -16.994,
+    "provider": "netmadeira",
+    "match": ["vigario"]
+  },
+  {
+    "id": "ribeira-brava",
+    "name": "Ribeira Brava",
+    "lat": 32.6731,
+    "lon": -17.0636,
+    "provider": "netmadeira",
+    "match": ["ribeira brava"]
+  },
+  {
+    "id": "ponta-do-sol",
+    "name": "Ponta do Sol",
+    "lat": 32.68,
+    "lon": -17.102,
+    "provider": "netmadeira",
+    "match": ["ponta do sol"]
+  },
+  {
+    "id": "santa-cruz",
+    "name": "Santa Cruz",
+    "lat": 32.688,
+    "lon": -16.792,
+    "provider": "netmadeira",
+    "match": ["santa cruz"]
+  },
+  {
+    "id": "machico",
+    "name": "Machico",
+    "lat": 32.7178,
+    "lon": -16.7667,
+    "provider": "netmadeira",
+    "match": ["machico"]
+  },
+  {
+    "id": "canical",
+    "name": "Caniçal",
+    "lat": 32.7387,
+    "lon": -16.7383,
+    "provider": "netmadeira",
+    "match": ["canical"]
+  },
+  {
+    "id": "praia-faial",
+    "name": "Praia do Faial",
+    "lat": 32.79,
+    "lon": -16.846,
+    "provider": "netmadeira",
+    "match": ["faial"]
+  },
+  {
+    "id": "santana-parque-tematico",
+    "name": "Santana",
+    "lat": 32.807,
+    "lon": -16.879,
+    "provider": "netmadeira",
+    "match": ["santana"]
+  },
+  {
+    "id": "sao-jorge",
+    "name": "São Jorge",
+    "lat": 32.83,
+    "lon": -16.91,
+    "provider": "netmadeira",
+    "match": ["sao jorge"]
+  },
+  {
+    "id": "boaventura",
+    "name": "Boaventura",
+    "lat": 32.8178,
+    "lon": -16.9894,
+    "provider": "netmadeira",
+    "match": ["boaventura"]
+  },
+  {
+    "id": "ponta-delgada",
+    "name": "Ponta Delgada",
+    "lat": 32.8253,
+    "lon": -16.9906,
+    "provider": "netmadeira",
+    "match": ["ponta delgada"]
+  },
+  {
+    "id": "seixal",
+    "name": "Seixal",
+    "lat": 32.824,
+    "lon": -17.111,
+    "provider": "netmadeira",
+    "match": ["seixal"]
+  },
+  {
+    "id": "porto-moniz",
+    "name": "Porto Moniz",
+    "lat": 32.8666,
+    "lon": -17.1696,
+    "provider": "netmadeira",
+    "match": ["porto moniz"]
+  },
+  {
+    "id": "porto-santo",
+    "name": "Porto Santo",
+    "lat": 33.0612,
+    "lon": -16.3388,
+    "provider": "netmadeira",
+    "match": ["porto santo"]
+  },
+  {
+    "id": "mw-calheta",
+    "name": "Calheta — praia",
+    "lat": 32.7232,
+    "lon": -17.1766,
+    "provider": "madeiraweb",
+    "match": ["calheta"]
+  },
+  {
+    "id": "mw-porto-moniz",
+    "name": "Porto Moniz 360°",
+    "lat": 32.867,
+    "lon": -17.17,
+    "provider": "madeiraweb",
+    "match": ["porto moniz", "360"]
+  },
+  {
+    "id": "mw-reis-magos",
+    "name": "Praia dos Reis Magos, Caniço",
+    "lat": 32.639,
+    "lon": -16.824,
+    "provider": "madeiraweb",
+    "match": ["reis magos"]
+  },
+  {
+    "id": "mw-airport",
+    "name": "Aeroporto da Madeira",
+    "lat": 32.695,
+    "lon": -16.775,
+    "provider": "madeiraweb",
+    "match": ["airport"]
+  }
+]

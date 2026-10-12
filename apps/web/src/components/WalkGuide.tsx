@@ -7,6 +7,7 @@ import {
   CornerUpLeft,
   CornerUpRight,
   Flag,
+  RefreshCw,
   TriangleAlert,
   Undo2,
   Volume2,
@@ -64,6 +65,8 @@ export function WalkGuide({
   position,
   to,
   speed,
+  rerouted,
+  late,
 }: {
   path: readonly LatLon[];
   position?: LatLon & { accuracy?: number };
@@ -71,6 +74,10 @@ export function WalkGuide({
   to: string;
   /** Walking speed (m/s), for the time left. */
   speed: number;
+  /** When (ms) the way was found anew from where the walker turned off it. */
+  rerouted?: number;
+  /** The bus at the end of the walk is gone before the walker gets there: what to say. */
+  late?: string;
 }) {
   const t = useI18n();
   const { settings, setSettings } = useApp();
@@ -92,6 +99,15 @@ export function WalkGuide({
     if (cue.stage === 'now') vibrate(cue.turn.kind === 'arrive' ? [400, 150, 400] : [250]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cue]);
+
+  // A way found anew: said for a few seconds under the next turn.
+  const [fresh, setFresh] = useState(false);
+  useEffect(() => {
+    if (!rerouted) return;
+    setFresh(true);
+    const id = window.setTimeout(() => setFresh(false), 6000);
+    return () => window.clearTimeout(id);
+  }, [rerouted]);
 
   // Over the top of the map, as a maps app's banner, whatever the sheet over it does: the
   // map's buttons step down below it, and a way fitted keeps clear of it.
@@ -162,7 +178,17 @@ export function WalkGuide({
           {hints ? <Volume2 size={20} /> : <VolumeX size={20} />}
         </button>
       </div>
-      {state?.offRoute && (
+      {fresh && (
+        <div className="walk-guide__new" role="status">
+          <RefreshCw size={15} aria-hidden /> {t.t('guide.rerouted')}
+        </div>
+      )}
+      {late && (
+        <div className="walk-guide__off" role="alert">
+          <TriangleAlert size={16} aria-hidden /> {late}
+        </div>
+      )}
+      {state?.offRoute && !fresh && (
         <div className="walk-guide__off" role="alert">
           <TriangleAlert size={16} aria-hidden /> {t.t('guide.offRoute')}
         </div>

@@ -468,6 +468,12 @@ export const pt: Dict = {
   'guide.hints': 'Indicações por voz',
   'guide.title': 'A pé',
   'guide.start': 'Começar a pé',
+  'guide.rerouted': 'Novo percurso calculado',
+  'guide.late': 'Pode não apanhar o {route} das {t}',
+  'layers.weather': 'Tempo na Madeira',
+  'layers.webcams': 'Webcams ao vivo',
+  'tab.weather': 'Tempo',
+  'tab.webcams': 'Webcams',
   'layers.scenic': 'Fotos das vistas',
   'hikes.title': 'Percursos pedestres e levadas',
   'hikes.intro':

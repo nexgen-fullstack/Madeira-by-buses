@@ -56,10 +56,32 @@ export function nextTrails(layers: MapLayers): MapLayers {
 
 const VECTOR_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 
-/** Imagery tiles; override with VITE_SATELLITE_TILES (e.g. a MapTiler or Esri key for production). */
+/**
+ * Imagery tiles, as sharp as a maps app's: Esri's "Clarity" imagery (cloud-free over the
+ * island, crisp, in true colours) as far as it goes, to tile zoom 17; closer in, Esri's
+ * World Imagery, which goes on to 19 (cars in the streets of Funchal). Override with
+ * VITE_SATELLITE_TILES (and VITE_SATELLITE_CLOSE_TILES), e.g. a MapTiler key for production.
+ */
 export const SATELLITE_TILES: string =
   import.meta.env.VITE_SATELLITE_TILES ||
+  'https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+export const SATELLITE_CLOSE_TILES: string =
+  import.meta.env.VITE_SATELLITE_CLOSE_TILES ||
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+/** The closest tile zoom of the first imagery, and of the second. */
+const SATELLITE_MAX = 17;
+const SATELLITE_CLOSE_MAX = 19;
+
+/**
+ * Imagery tiles drawn at half their size on a sharp screen (a phone's two or three pixels
+ * to a point): tiles of the next zoom, as crisp as the screen, as a maps app sends them.
+ */
+export const satelliteTileSize = (pixelRatio = globalThis.devicePixelRatio ?? 1) =>
+  pixelRatio >= 1.5 ? 128 : 256;
+
+/** The map zoom from which the first imagery has no closer tiles and the second takes over. */
+export const satelliteSwitch = (tileSize: number) =>
+  SATELLITE_MAX - Math.log2(512 / tileSize) + 0.5;
 const SATELLITE_ATTRIBUTION =
   import.meta.env.VITE_SATELLITE_ATTRIBUTION ||
   'Imagery © <a href="https://www.esri.com/">Esri</a>, Maxar, Earthstar Geographics';
@@ -143,32 +165,56 @@ function reliefLayers(): LayerSpecification[] {
 }
 
 /**
- * The imagery a little lighter than it comes: the deep ocean around Madeira
- * and the island's forests are nearly black in it, and on a phone in the sun
- * that reads as a dark blot.
+ * The imagery a touch lighter and livelier than it comes, as a maps app shows it: the deep
+ * ocean and the laurel forest are nearly black in it, which on a phone in the sun reads as
+ * a dark blot; lifted only a little, so it does not turn hazy.
  */
 export const SATELLITE_PAINT = {
-  'raster-brightness-min': 0.2,
+  'raster-brightness-min': 0.06,
   'raster-brightness-max': 1,
-  'raster-contrast': 0.1,
-  'raster-saturation': 0.3,
+  'raster-contrast': 0.08,
+  'raster-saturation': 0.12,
+  'raster-resampling': 'linear',
 } as const;
 
 function satelliteLayers(): LayerSpecification[] {
+  const handOver = satelliteSwitch(satelliteTileSize());
   return [
-    { id: 'mb-background', type: 'background', paint: { 'background-color': '#33495a' } },
-    { id: 'mb-satellite', type: 'raster', source: 'mb-satellite', paint: { ...SATELLITE_PAINT } },
+    { id: 'mb-background', type: 'background', paint: { 'background-color': '#1f3445' } },
+    {
+      id: 'mb-satellite',
+      type: 'raster',
+      source: 'mb-satellite',
+      maxzoom: handOver + 0.5,
+      paint: { ...SATELLITE_PAINT },
+    },
+    // Closer in, over it (half a zoom early, so nothing shows through while it loads).
+    {
+      id: 'mb-satellite-close',
+      type: 'raster',
+      source: 'mb-satellite-close',
+      minzoom: handOver - 0.5,
+      paint: { ...SATELLITE_PAINT },
+    },
   ];
 }
 
 function baseSources(base: BaseLayer): Record<string, SourceSpecification> {
   if (base === 'satellite') {
+    const tileSize = satelliteTileSize();
     return {
       'mb-satellite': {
         type: 'raster',
         tiles: [SATELLITE_TILES],
-        tileSize: 256,
-        maxzoom: 19,
+        tileSize,
+        maxzoom: SATELLITE_MAX,
+        attribution: SATELLITE_ATTRIBUTION,
+      },
+      'mb-satellite-close': {
+        type: 'raster',
+        tiles: [SATELLITE_CLOSE_TILES],
+        tileSize,
+        maxzoom: SATELLITE_CLOSE_MAX,
         attribution: SATELLITE_ATTRIBUTION,
       },
     };

@@ -21,12 +21,13 @@ import {
   type WalkLeg,
 } from '@madeirabus/engine';
 import { useI18n } from '../i18n.ts';
-import { askNotify, canNotify, keepScreenOn, notify, vibrate } from '../lib/device.ts';
+import { askNotify, canNotify, keepScreenOn, notify, speak, vibrate } from '../lib/device.ts';
 import { useGeolocation } from '../lib/geolocation.ts';
 import { ridesOf } from '../lib/itinerary.ts';
 import { walkPath } from '../lib/mapContent.ts';
 import type { LatLon } from '@madeirabus/engine';
 import { RideSimulator } from '../lib/simulator.ts';
+import { OffWay } from '../lib/reroute.ts';
 import { useApp, type ActiveTrip } from './app.tsx';
 
 /**
@@ -44,6 +45,10 @@ export interface WalkNow {
   leg: WalkLeg;
   /** Its way as the map draws it. */
   path: LatLon[];
+  /** When (ms) a new way was found from where the walker turned off, as a maps app re-plans. */
+  rerouted?: number;
+  /** With the new way, the bus at its end leaves before the walker gets there. */
+  late?: boolean;
 }
 
 export interface RideSetup {
@@ -106,7 +111,8 @@ function TripEngine({
   onChange: (v: TripTracking | undefined) => void;
 }) {
   const t = useI18n();
-  const { setTrip } = useApp();
+  const { setTrip, data, settings } = useApp();
+  const planner = data.status === 'ready' ? data.planner : undefined;
   const [rideIndex, setRideIndex] = useState(() => trip.ride ?? 0);
   const [phase, setPhase] = useState<TripTracking['phase']>(() =>
     trip.itinerary.rides === 0 ? 'walk' : 'ride',
@@ -238,10 +244,59 @@ function TripEngine({
     const last = legs.at(-1);
     return phase === 'done' && isWalk(last) ? last : undefined;
   }, [legs, phase, rideIndex, waiting, ride, nextRide]);
-  const walk = useMemo<WalkNow | undefined>(
-    () => (walkLeg ? { leg: walkLeg, path: walkPath(walkLeg) } : undefined),
-    [walkLeg],
-  );
+  // Off the way (a street turned into that the walk does not take): a new way from where the
+  // walker is to where the walk goes, as a maps app re-plans; told aloud with the hints on.
+  const [rerouted, setRerouted] = useState<
+    { for: WalkLeg; leg: WalkLeg; at: number; late: boolean } | undefined
+  >();
+  const walk = useMemo<WalkNow | undefined>(() => {
+    if (!walkLeg) return undefined;
+    if (rerouted?.for === walkLeg)
+      return {
+        leg: rerouted.leg,
+        path: walkPath(rerouted.leg),
+        rerouted: rerouted.at,
+        late: rerouted.late,
+      };
+    return { leg: walkLeg, path: walkPath(walkLeg) };
+  }, [walkLeg, rerouted]);
+  const offWay = useMemo(() => walk && new OffWay(walk.path), [walk]);
+  const finding = useRef(false);
+  const busAfter = phase === 'transfer' ? nextRide : phase === 'ride' ? ride : undefined;
+  useEffect(() => {
+    const fix = geo.position;
+    if (trip.simulate || !walk || !walkLeg || !offWay || !fix || !planner || finding.current)
+      return;
+    if (!offWay.update(fix, fix.accuracy, Date.now())) return;
+    finding.current = true;
+    const from = { lat: fix.lat, lon: fix.lon };
+    void planner
+      .travel(['walk'], from, walk.leg.to, settings.walkSpeed)
+      .then(([way]) => {
+        if (!way) return;
+        const now = madeiraNow().time;
+        const leg: WalkLeg = {
+          ...walk.leg,
+          from: { ...from, name: t.t('place.myLocation') },
+          start: now,
+          end: now + way.seconds,
+          distance: Math.round(way.length),
+          path: way.path,
+          ...(way.kerb ? { kerb: way.kerb } : { kerb: undefined }),
+          up: way.up,
+          down: way.down,
+          scenic: undefined,
+        };
+        // The bus at the end of the walk: still caught, or gone before the walker gets there.
+        const late = busAfter !== undefined && busAfter.start < now + way.seconds;
+        setRerouted({ for: walkLeg, leg, at: Date.now(), late });
+        if (settings.walkHints ?? true) speak(t.t('guide.rerouted'), t.locale);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        finding.current = false;
+      });
+  }, [geo.position, trip.simulate, walk, walkLeg, offWay, planner, settings, t, busAfter]);
 
   // In the simulation, a walker going along it (but not to the first bus: the bus comes).
   const [walker, setWalker] = useState<LatLon | undefined>();

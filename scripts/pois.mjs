@@ -1,6 +1,7 @@
 // The places of everyday life on the map's "Places" button, as Google Maps lists them:
-// hospitals, pharmacies, police, hotels, restaurants, cafés and pastry shops, groceries and
-// markets, shops, museums, rentals, garages, hairdressers, cash machines, toilets, beaches…
+// hospitals, doctors, pharmacies, police, hotels, restaurants, cafés and pastry shops,
+// groceries and markets, every shop, sights, museums, theatres, churches, gyms, tours,
+// rentals, garages, hairdressers, cash machines, toilets, beaches…
 // One Overpass query (`poiQuery`), made small for the app (`compactPois`): a category, a name,
 // where it is, and its opening hours, phone and website when OpenStreetMap has them.
 //
@@ -12,17 +13,32 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /**
- * The categories, in the order the app offers them, each with the OpenStreetMap tags that
- * belong to it (key → values; '*' any value). The first category a place matches wins.
+ * The categories, each with the OpenStreetMap tags that belong to it (key → values; '*' any
+ * value). The first category a place matches wins.
  */
 export const POI_CATEGORIES = [
   ['hospital', { amenity: ['hospital', 'clinic'], healthcare: ['hospital', 'clinic', 'centre'] }],
+  [
+    'doctor',
+    {
+      amenity: ['doctors', 'dentist'],
+      healthcare: [
+        'doctor',
+        'dentist',
+        'physiotherapist',
+        'laboratory',
+        'optometrist',
+        'podiatrist',
+        'psychotherapist',
+      ],
+    },
+  ],
   ['pharmacy', { amenity: ['pharmacy'], healthcare: ['pharmacy'] }],
   ['police', { amenity: ['police'] }],
   ['hotel', { tourism: ['hotel', 'guest_house', 'hostel', 'motel', 'apartment', 'chalet'] }],
   ['restaurant', { amenity: ['restaurant', 'fast_food', 'food_court'] }],
   ['cafe', { amenity: ['cafe', 'ice_cream'], shop: ['pastry', 'bakery', 'confectionery'] }],
-  ['bar', { amenity: ['bar', 'pub', 'biergarten'] }],
+  ['bar', { amenity: ['bar', 'pub', 'biergarten', 'nightclub'] }],
   [
     'grocery',
     {
@@ -41,52 +57,33 @@ export const POI_CATEGORIES = [
     },
   ],
   ['mall', { shop: ['mall', 'department_store'] }],
-  [
-    'shop',
-    {
-      shop: [
-        'clothes',
-        'shoes',
-        'gift',
-        'souvenir',
-        'books',
-        'electronics',
-        'mobile_phone',
-        'computer',
-        'sports',
-        'outdoor',
-        'jewelry',
-        'cosmetics',
-        'perfumery',
-        'variety_store',
-        'hardware',
-        'doityourself',
-        'optician',
-        'wine',
-        'alcohol',
-        'bag',
-        'boutique',
-        'toys',
-        'stationery',
-        'photo',
-        'craft',
-        'art',
-        'chemist',
-        'tobacco',
-        'newsagent',
-        'kiosk',
-      ],
-    },
-  ],
+  ['tour', { shop: ['travel_agency'], office: ['travel_agent', 'guide'] }],
   ['park', { leisure: ['park', 'garden'] }],
   ['beach', { natural: ['beach'], leisure: ['beach_resort', 'swimming_area'] }],
+  [
+    'attraction',
+    {
+      tourism: ['attraction', 'zoo', 'aquarium', 'theme_park'],
+      historic: ['castle', 'fort', 'monument', 'archaeological_site', 'ruins'],
+    },
+  ],
   ['museum', { tourism: ['museum', 'gallery'] }],
+  ['culture', { amenity: ['theatre', 'cinema', 'arts_centre', 'casino', 'concert_hall'] }],
+  ['church', { amenity: ['place_of_worship'] }],
+  ['gym', { leisure: ['fitness_centre', 'sports_centre', 'golf_course', 'water_park'] }],
   ['library', { amenity: ['library'] }],
+  ['government', { amenity: ['townhall', 'courthouse'], office: ['government', 'diplomatic'] }],
   ['info', { tourism: ['information'] }],
   [
     'rental',
     {
-      amenity: ['car_rental', 'motorcycle_rental', 'bicycle_rental', 'scooter_rental'],
+      amenity: [
+        'car_rental',
+        'motorcycle_rental',
+        'bicycle_rental',
+        'scooter_rental',
+        'boat_rental',
+      ],
       shop: ['rental'],
     },
   ],
@@ -98,13 +95,15 @@ export const POI_CATEGORIES = [
   ],
   ['carwash', { amenity: ['car_wash'] }],
   ['parking', { amenity: ['parking'] }],
-  ['hair', { shop: ['hairdresser', 'beauty', 'barber'] }],
+  ['hair', { shop: ['hairdresser', 'beauty', 'barber', 'massage', 'tattoo'], amenity: ['spa'] }],
   ['laundry', { shop: ['laundry', 'dry_cleaning'] }],
   ['atm', { amenity: ['atm', 'bank', 'bureau_de_change'] }],
   ['post', { amenity: ['post_office'] }],
   ['taxi', { amenity: ['taxi'] }],
   ['toilets', { amenity: ['toilets'] }],
   ['water', { amenity: ['drinking_water'] }],
+  // Every other shop: clothes, books, furniture, flowers, bikes… (Google Maps shows them all).
+  ['shop', { shop: ['*'] }],
 ];
 
 /** The Overpass query for every place of the categories in a bounding box. */
@@ -113,17 +112,25 @@ export function poiQuery(bbox) {
   for (const [, tags] of POI_CATEGORIES)
     for (const [key, values] of Object.entries(tags))
       byKey.set(key, [...(byKey.get(key) ?? []), ...values]);
-  const parts = [...byKey].map(
-    ([key, values]) => `nwr["${key}"~"^(${[...new Set(values)].join('|')})$"](${bbox});`,
+  const parts = [...byKey].map(([key, values]) =>
+    values.includes('*')
+      ? `nwr["${key}"](${bbox});`
+      : `nwr["${key}"~"^(${[...new Set(values)].join('|')})$"](${bbox});`,
   );
   return `[out:json][timeout:300];\n(${parts.join('\n ')});\nout center tags qt;`;
 }
 
-/** The category of a place by its tags, or undefined. */
+/** Values that say there is no such place any more ("shop=vacant"). */
+const GONE = new Set(['no', 'vacant', 'disused', 'closed', 'abandoned']);
+
+/** The category of a place by its tags and the value that made it so ("pastry"), or undefined. */
 function categoryOf(tags) {
   for (const [id, wanted] of POI_CATEGORIES)
-    for (const [key, values] of Object.entries(wanted))
-      if (tags[key] && values.includes(tags[key])) return id;
+    for (const [key, values] of Object.entries(wanted)) {
+      const value = tags[key];
+      if (value && !GONE.has(value) && (values.includes(value) || values.includes('*')))
+        return { id, kind: value };
+    }
   return undefined;
 }
 
@@ -148,7 +155,8 @@ export function compactPois(elements) {
     const lat = e.lat ?? e.center?.lat;
     const lon = e.lon ?? e.center?.lon;
     if (lat === undefined || lon === undefined || closed(tags)) continue;
-    const category = categoryOf(tags);
+    const found = categoryOf(tags);
+    const category = found?.id;
     if (!category || (category === 'info' && !office(tags))) continue;
     const name = tags.name ?? tags.brand ?? tags.operator ?? '';
     if (!name && !nameless.has(category)) continue;
@@ -157,10 +165,7 @@ export function compactPois(elements) {
     if (seen.has(key)) continue;
     seen.add(key);
     const extra = {};
-    const kind = Object.values(POI_CATEGORIES.find(([id]) => id === category)[1])
-      .flat()
-      .find((v) => Object.values(tags).includes(v));
-    if (kind) extra.k = kind;
+    if (found.kind !== 'yes') extra.k = found.kind;
     if (tags.opening_hours) extra.h = tags.opening_hours;
     const phone = tags.phone ?? tags['contact:phone'];
     if (phone) extra.p = phone;

@@ -8,6 +8,7 @@ interface ImportMetaEnv {
   /** Android app download link shown on the website. */
   readonly VITE_ANDROID_APK?: string;
   readonly VITE_SATELLITE_TILES?: string;
+  readonly VITE_SATELLITE_CLOSE_TILES?: string;
   readonly VITE_SATELLITE_ATTRIBUTION?: string;
 }
 

@@ -4,12 +4,14 @@ import {
   Camera,
   Check,
   Clock,
+  CloudSun,
   ExternalLink,
   Flag,
   LayoutGrid,
   MapPin,
   Phone,
   Signpost,
+  Video,
   X,
 } from 'lucide-react';
 import {
@@ -21,6 +23,7 @@ import {
   ScaleControl,
   setWorkerUrl,
   type ExpressionSpecification,
+  type FilterSpecification,
   type GeoJSONSource,
   type MapMouseEvent,
   type StyleSpecification,
@@ -46,6 +49,7 @@ import {
   type FlagLook,
   type FlagMode,
   type LineNote,
+  type MapBadge,
   type MapContent,
   type ScenicSpot,
 } from '../lib/mapContent.ts';
@@ -71,9 +75,26 @@ import { LayerSwitcher } from './LayerSwitcher.tsx';
 import { LineCard, LineChooser, type LinePick } from './LineCard.tsx';
 import { MapContentContext, type PickField, type Spotlight } from './mapContext.tsx';
 import { busImage, busImageId } from './busImage.ts';
-import { PlacesChip, PlacesPicker, poiImage, poiImageId } from './PlacesPicker.tsx';
-import { loadPois, poiName, type Poi, type PoiCategory } from '../lib/pois.ts';
+import {
+  bigStoreImage,
+  bigStoreImageId,
+  PlacesChip,
+  PlacesPicker,
+  poiImage,
+  poiImageId,
+} from './PlacesPicker.tsx';
+import {
+  loadPois,
+  ofCategory,
+  POI_LOOK,
+  poiName,
+  poiRank,
+  type Poi,
+  type PoiCategory,
+} from '../lib/pois.ts';
 import type { LiveBus } from '../lib/liveBus.ts';
+import { useWarnings, useWeather } from '../lib/useWeather.ts';
+import { skySign, worstLevel } from '../lib/weather.ts';
 
 // MapLibre computes its worker URL at runtime, which bundlers cannot see; point it at the bundled worker.
 setWorkerUrl(maplibreWorkerUrl);
@@ -650,23 +671,182 @@ function addWalkDots(map: MapLibreMap, content: MapContent) {
   }
 }
 
-/** Puts the places of the kind chosen on the map, its dot drawn once. */
-async function applyPois(map: MapLibreMap, pois: readonly Poi[]) {
-  const category = pois[0]?.category;
-  if (category && !map.hasImage(poiImageId(category))) {
+/** Puts on the map the dots of the places' kinds and the big supermarkets' signs, each once. */
+async function addPoiImages(map: MapLibreMap, pois: readonly Poi[]) {
+  for (const category of new Set(pois.map((p) => p.category))) {
+    if (map.hasImage(poiImageId(category))) continue;
     const image = await poiImage(category);
     if (image && !map.hasImage(poiImageId(category)))
       map.addImage(poiImageId(category), image, { pixelRatio: 2 });
   }
+  for (const pingo of [false, true]) {
+    const id = bigStoreImageId({ name: pingo ? 'Pingo Doce' : 'Continente' });
+    if (map.hasImage(id) || !pois.some((p) => p.big)) continue;
+    const image = bigStoreImage(pingo);
+    if (image) map.addImage(id, image, { pixelRatio: 2 });
+  }
+}
+
+/** A place's dot (a big supermarket's sign) and the colour its name is written in. */
+const poiLook = (p: Poi) =>
+  p.big
+    ? { image: bigStoreImageId(p), color: '#202124' }
+    : { image: poiImageId(p.category), color: POI_LOOK[p.category].color };
+
+/** Puts the places of the kind chosen on the map, its dot drawn once. */
+async function applyPois(map: MapLibreMap, pois: readonly Poi[]) {
+  await addPoiImages(map, pois);
   (map.getSource('mb-pois') as GeoJSONSource | undefined)?.setData({
     type: 'FeatureCollection',
     features: pois.map((p, i) => ({
       type: 'Feature',
-      properties: { i, image: poiImageId(p.category), name: p.name, color: '#3c4043' },
+      properties: { i, image: poiLook(p).image, name: p.name, color: '#3c4043', big: !!p.big },
       geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
     })),
   });
 }
+
+/**
+ * Every place of everyday life close in, as a maps app shows them along the streets: the big
+ * supermarkets and the sights from afar, then where to eat, drink and sleep, then the shops
+ * and services, the car parks and toilets last; their names closer in. Each rank a layer of
+ * its own, the more important over (and so placed before) the rest.
+ */
+const ALL_POI_ZOOMS: readonly [rank: number, minzoom: number][] = [
+  [4, 17.5],
+  [3, 16],
+  [2, 15.2],
+  [1, 14.5],
+  [0, 13],
+];
+/** From this zoom the names of the everyday places are written beside them. */
+const POI_NAMES_FROM = 16.5;
+const allPoiLayerId = (rank: number) => `mb-allpoi-${rank}`;
+export const ALL_POI_LAYERS = ALL_POI_ZOOMS.map(([rank]) => allPoiLayerId(rank));
+
+function addAllPoiLayers(map: MapLibreMap) {
+  map.addSource('mb-allpois', { type: 'geojson', data: EMPTY });
+  for (const [rank, minzoom] of ALL_POI_ZOOMS) {
+    const big = rank === 0;
+    map.addLayer({
+      id: allPoiLayerId(rank),
+      type: 'symbol',
+      source: 'mb-allpois',
+      minzoom,
+      filter: ['==', ['get', 'rank'], rank],
+      layout: {
+        'icon-image': ['get', 'image'],
+        'icon-size': big
+          ? ['interpolate', ['linear'], ['zoom'], 13, 0.55, 16, 0.8]
+          : ['interpolate', ['linear'], ['zoom'], minzoom, 0.5, 18, 0.72],
+        'icon-padding': 1,
+        'text-field':
+          rank <= 1 ? ['get', 'name'] : ['step', ['zoom'], '', POI_NAMES_FROM, ['get', 'name']],
+        'text-font': [big ? 'Noto Sans Bold' : 'Noto Sans Regular'],
+        'text-size': big ? 12 : 11,
+        'text-anchor': 'left',
+        'text-offset': [big ? 1.2 : 0.9, 0],
+        'text-max-width': 8,
+        'text-optional': true,
+      },
+      paint: {
+        'text-color': ['get', 'color'],
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 1.4,
+      },
+    });
+  }
+}
+
+/**
+ * Puts every place of everyday life on the map (none while a kind of place is chosen on the
+ * "Places" button: those alone then, as a maps app shows what was asked for).
+ */
+async function applyAllPois(map: MapLibreMap, pois: readonly Poi[] | undefined, on: boolean) {
+  const source = map.getSource('mb-allpois') as GeoJSONSource | undefined;
+  if (!source) return;
+  if (pois && on) await addPoiImages(map, pois);
+  source.setData({
+    type: 'FeatureCollection',
+    features:
+      pois && on
+        ? pois.map((p, i) => ({
+            type: 'Feature',
+            properties: { i, name: p.name, rank: poiRank(p), ...poiLook(p) },
+            geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+          }))
+        : [],
+  });
+  hideCoveredBasePois(map, Boolean(pois && on));
+}
+
+/**
+ * The map style's own shops, cafés, hotels… (OpenMapTiles classes and subclasses) that the
+ * app's places draw too: hidden while those are on, so none shows twice. Viewpoints, schools,
+ * stadiums and the like stay.
+ */
+export const COVERED_POI_CLASSES = [
+  'shop',
+  'grocery',
+  'restaurant',
+  'fast_food',
+  'cafe',
+  'ice_cream',
+  'bar',
+  'beer',
+  'alcohol_shop',
+  'bakery',
+  'clothing_store',
+  'lodging',
+  'hospital',
+  'pharmacy',
+  'dentist',
+  'doctors',
+  'bank',
+  'atm',
+  'fuel',
+  'car',
+  'laundry',
+  'post',
+  'library',
+  'museum',
+  'theatre',
+  'cinema',
+  'art_gallery',
+  'music',
+  'place_of_worship',
+  'town_hall',
+  'police',
+  'hairdresser',
+  'beauty',
+  'castle',
+  'zoo',
+  'aquarium',
+];
+
+function hideCoveredBasePois(map: MapLibreMap, hide: boolean) {
+  const style = map.getStyle();
+  if (!style) return;
+  const covered = [
+    'any',
+    ['match', ['get', 'class'], COVERED_POI_CLASSES, true, false],
+    ['match', ['get', 'subclass'], [...COVERED_POI_CLASSES, 'attraction'], true, false],
+  ];
+  for (const id of placeLayerIds(style)) {
+    // The style's own filter, kept aside the first time.
+    const own = (baseFilters.get(map) ?? baseFilters.set(map, new Map()).get(map)!) as Map<
+      string,
+      unknown
+    >;
+    if (!own.has(id)) own.set(id, map.getFilter(id) ?? null);
+    const base = own.get(id) as FilterSpecification | null;
+    const filter = hide ? (base ? ['all', base, ['!', covered]] : ['!', covered]) : base;
+    map.setFilter(id, filter as FilterSpecification | null);
+  }
+}
+
+/** Each map's style filters of its places, before the app's places hid some (per style). */
+const baseFilters = new WeakMap<MapLibreMap, Map<string, unknown>>();
 
 /** Puts the buses where they are now on the map, each look drawn once. */
 function applyBuses(map: MapLibreMap, buses: readonly LiveBus[] | undefined) {
@@ -701,6 +881,8 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
     const image = make();
     if (image) map.addImage(id, image, { pixelRatio: 2 });
   }
+  // The shops, cafés and sights along the streets, under all the app draws.
+  addAllPoiLayers(map);
   // Every stop and line, under whatever the screen draws.
   map.addSource('mb-net-lines', { type: 'geojson', data: EMPTY });
   map.addSource('mb-net-stops', { type: 'geojson', data: EMPTY });
@@ -805,8 +987,10 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
       'icon-image': ['get', 'image'],
       'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.55, 14, 0.8, 17, 1],
       'icon-padding': 1,
-      // Where they crowd (far out), some step aside; closer in, all of them.
+      // Where they crowd (far out), some step aside, the big supermarkets last; closer in,
+      // all of them.
       'icon-allow-overlap': false,
+      'symbol-sort-key': ['case', ['get', 'big'], 0, 1],
     },
   });
   map.addSource('mb-lines', { type: 'geojson', data: EMPTY });
@@ -1134,14 +1318,23 @@ function addOverlay(map: MapLibreMap, base: BaseLayer) {
       id: 'mb-poi-label',
       type: 'symbol',
       source: 'mb-pois',
-      minzoom: 15.5,
+      minzoom: 12,
       layout: {
-        'text-field': ['get', 'name'],
+        // A Continente's or a Pingo Doce's name from afar, the others' close in.
+        'text-field': [
+          'step',
+          ['zoom'],
+          ['case', ['get', 'big'], ['get', 'name'], ''],
+          15.5,
+          ['get', 'name'],
+        ],
         'text-size': 11,
         'text-offset': [0, 1.2],
         'text-anchor': 'top',
         'text-max-width': 9,
         'text-optional': true,
+        // The names never push the places' dots off the map (they are drawn above them).
+        'text-ignore-placement': true,
         'text-font': ['Noto Sans Regular'],
       },
       paint: {
@@ -1419,11 +1612,17 @@ export default function MapView({ className }: { className?: string }) {
   const [poiCategory, setPoiCategory] = useState<PoiCategory | undefined>();
   const [pois, setPois] = useState<Poi[] | undefined>();
   const shownPois = useMemo(
-    () => (poiCategory && pois ? pois.filter((p) => p.category === poiCategory) : []),
+    () => (poiCategory && pois ? ofCategory(pois, poiCategory) : []),
     [poiCategory, pois],
   );
   const poisRef = useRef<Poi[]>([]);
   poisRef.current = shownPois;
+  // Every place along the streets once the map comes close to them (with the map's places
+  // on, and not while a kind of place is chosen or a point is being picked).
+  const [nearStreets, setNearStreets] = useState(false);
+  const allPoisOn = layers.places && !poiCategory && !pick;
+  const allPoisRef = useRef<{ pois?: Poi[]; on: boolean }>({ on: false });
+  allPoisRef.current = { pois, on: allPoisOn };
   const [note, setNote] = useState<LineNote | undefined>();
   // A line tapped: its card, or a short list when several lie under the finger.
   const [linePick, setLinePick] = useState<LinePick | undefined>();
@@ -1444,7 +1643,18 @@ export default function MapView({ className }: { className?: string }) {
   const trailsRef = useRef<{ data?: TrailData; on: boolean; only?: readonly string[] }>({
     on: false,
   });
-  const trailsOn = layers.trails;
+  // A way shown (a bus journey, a walk, a drive, a trip under way), the trails step aside:
+  // one met on the way would lead the walker off it, up the hill. The trails button brings
+  // them back for that way; a trail's own page shows them as ever.
+  const [trailsWith, setTrailsWith] = useState<string | undefined>();
+  const wayShown = content.focus !== undefined && !content.focus.startsWith('hike:');
+  // Each way its own: trails asked for over one walk are not over the next.
+  const wayKey = wayShown ? `${content.focus}|${content.fitKey ?? ''}` : undefined;
+  const trailsOn = layers.trails && (!wayShown || trailsWith === wayKey);
+  // Back to the island, the next way shown starts without them again.
+  useEffect(() => {
+    if (!wayShown) setTrailsWith(undefined);
+  }, [wayShown]);
   const trailIds = content.trailIds;
   const [trailData, setTrailData] = useState<TrailData | undefined>();
   useEffect(() => {
@@ -1539,6 +1749,7 @@ export default function MapView({ className }: { className?: string }) {
     map.once('load', hideLaunch);
     map.on('style.load', () => {
       styleLoaded.current = true;
+      baseFilters.delete(map);
       addOverlay(map, layersRef.current.base);
       applyDetails(map, layersRef.current);
       applyTransit(map, transitRef.current.data, transitRef.current.on);
@@ -1548,7 +1759,12 @@ export default function MapView({ className }: { className?: string }) {
       apply(map, contentRef.current, fitted);
       applyBuses(map, busesRef.current);
       void applyPois(map, poisRef.current);
+      void applyAllPois(map, allPoisRef.current.pois, allPoisRef.current.on);
     });
+    // Close to the streets the first time: their shops and cafés are loaded.
+    const nearTheStreets = () => map.getZoom() >= 12.5 && setNearStreets(true);
+    map.on('zoomend', nearTheStreets);
+    map.once('load', nearTheStreets);
     map.on('click', (e: MapMouseEvent) => {
       releasePins(map);
       foldCredits();
@@ -1635,6 +1851,16 @@ export default function MapView({ className }: { className?: string }) {
       const mine = features.find((f) => f.layer.id === 'mb-poi');
       if (mine) {
         const p = poisRef.current[Number(mine.properties?.i)];
+        if (p) {
+          setPicked({ name: p.name, lat: p.lat, lon: p.lon, poi: p });
+          return;
+        }
+      }
+      // A shop or café along the street: the same card.
+      const along = features.find((f) => ALL_POI_LAYERS.includes(f.layer.id));
+      const every = allPoisRef.current.pois;
+      if (along && every) {
+        const p = every[Number(along.properties?.i)];
         if (p) {
           setPicked({ name: p.name, lat: p.lat, lon: p.lon, poi: p });
           return;
@@ -1782,13 +2008,17 @@ export default function MapView({ className }: { className?: string }) {
   // The places of the kind chosen: loaded the first time, put on the map; when none is in
   // view, the map goes to the nearest.
   useEffect(() => {
-    if (!poiCategory || pois) return;
+    if ((!poiCategory && !nearStreets) || pois) return;
     let cancelled = false;
     void loadPois().then((p) => !cancelled && setPois(p));
     return () => {
       cancelled = true;
     };
-  }, [poiCategory, pois]);
+  }, [poiCategory, nearStreets, pois]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map && ready) void applyAllPois(map, pois, allPoisOn);
+  }, [pois, allPoisOn, ready]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
@@ -1854,6 +2084,13 @@ export default function MapView({ className }: { className?: string }) {
   }, [layers.scenic, content.scenic, trailsOn, trailPhotosOn, hikeChosen, allTrails, trailIds]);
   // A kind of place shown from the "Places" button: its dots alone, not hidden under photos.
   useScenicMarkers(mapRef, ready, pick || poiCategory ? undefined : photoSpots);
+  // The screen's little signs: the weather of each part of the island, the webcams.
+  useBadgeMarkers(mapRef, ready, pick ? undefined : content.badges);
+  // On the weather button, the sky and warmth in Funchal now and the worst warning's colour.
+  const { forecasts } = useWeather();
+  const warnings = useWarnings();
+  const warning = warnings ? worstLevel(warnings) : undefined;
+  const funchal = forecasts?.[0]?.now;
   // A run or a line tapped belongs to the map shown; another one, forget it.
   useEffect(() => {
     setNote(undefined);
@@ -2017,7 +2254,14 @@ export default function MapView({ className }: { className?: string }) {
                 : 'layers.trailsLines',
           )}
           data-step={!trailsOn ? 'off' : trailPhotosOn ? 'photos' : 'lines'}
-          onClick={() => setSettings({ map: nextTrails(layers) })}
+          onClick={() => {
+            // Over a way shown, the first tap brings the trails back for it.
+            if (wayShown && trailsWith !== wayKey) {
+              setTrailsWith(wayKey);
+              if (layers.trails) return;
+            }
+            setSettings({ map: nextTrails(layers) });
+          }}
         >
           <Signpost size={18} />
           {trailsOn && trailPhotosOn && (
@@ -2033,6 +2277,33 @@ export default function MapView({ className }: { className?: string }) {
           onClick={() => setSettings({ map: { ...layers, scenic: !layers.scenic } })}
         >
           <Camera size={18} />
+        </button>
+        {/* The weather on the island, with the colour of any official warning. */}
+        <button
+          type="button"
+          className={`map-tool map-tool--weather${warning ? ` map-tool--warn-${warning}` : ''}`}
+          aria-label={t.t('layers.weather')}
+          title={t.t('layers.weather')}
+          onClick={() => navigate('weather')}
+        >
+          {funchal ? (
+            <span className="map-tool__weather" aria-hidden>
+              <span>{skySign(funchal.code, funchal.day)}</span>
+              <span>{Math.round(funchal.temp)}°</span>
+            </span>
+          ) : (
+            <CloudSun size={18} />
+          )}
+        </button>
+        {/* The island's live webcams. */}
+        <button
+          type="button"
+          className="map-tool"
+          aria-label={t.t('layers.webcams')}
+          title={t.t('layers.webcams')}
+          onClick={() => navigate('webcams')}
+        >
+          <Video size={18} />
         </button>
         {/* The places of everyday life, as a maps app groups them: hospitals, hotels, cafés… */}
         <button
@@ -2403,6 +2674,60 @@ function useScenicMarkers(
       for (const m of markers) m.remove();
     };
   }, [mapRef, ready, spots]);
+}
+
+/**
+ * The screen's little signs on the map where they are (the weather of each part of the
+ * island, the webcams), each a tap away from what it shows.
+ */
+function useBadgeMarkers(
+  mapRef: { current: MapLibreMap | null },
+  ready: boolean,
+  badges: readonly MapBadge[] | undefined,
+): void {
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !badges || badges.length === 0) return;
+    const markers = badges.map((b) => {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = [
+        'map-badge',
+        `map-badge--${b.kind}`,
+        b.active ? 'map-badge--active' : '',
+        b.live ? 'map-badge--live' : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+      el.setAttribute('aria-label', [b.text, b.sub].filter(Boolean).join(', '));
+      const text = document.createElement('span');
+      text.className = 'map-badge__text';
+      text.textContent = b.text;
+      el.append(text);
+      if (b.sub) {
+        const sub = document.createElement('span');
+        sub.className = 'map-badge__sub';
+        sub.textContent = b.sub;
+        el.append(sub);
+      }
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        b.onTap?.();
+      });
+      return new Marker({ element: el, anchor: 'bottom' }).setLngLat([b.lon, b.lat]).addTo(map);
+    });
+    // Close in, their names; far out, the signs alone.
+    const named = () =>
+      markers.forEach((m) =>
+        m.getElement().classList.toggle('map-badge--named', map.getZoom() >= 10.2),
+      );
+    named();
+    map.on('zoomend', named);
+    return () => {
+      map.off('zoomend', named);
+      for (const m of markers) m.remove();
+    };
+  }, [mapRef, ready, badges]);
 }
 
 /** Opens the planner keeping whatever origin/destination is already set. */

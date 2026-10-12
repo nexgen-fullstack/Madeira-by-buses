@@ -77,6 +77,7 @@ describe('map styles', () => {
     expect(ids(hybrid)).toEqual([
       'mb-background',
       'mb-satellite',
+      'mb-satellite-close',
       'road',
       'building-3d',
       'poi',
