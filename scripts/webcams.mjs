@@ -78,25 +78,44 @@ async function feed(channel) {
   return readFeed(await res.text());
 }
 
-/** With a key: every broadcast of the channel live now (YouTube Data API, 100 units). */
+/**
+ * With a key: every broadcast of the channel live now — its uploads (the newest 200) asked
+ * which are live (YouTube Data API, about 10 units; its live search misses them).
+ */
 async function liveNow(channel, key) {
-  const q = new URLSearchParams({
-    part: 'snippet',
-    channelId: channel,
-    eventType: 'live',
-    type: 'video',
-    maxResults: '50',
-    key,
-  });
-  const res = await fetch(`https://www.googleapis.com/youtube/v3/search?${q}`);
-  if (!res.ok) throw new Error(`YouTube API: HTTP ${res.status}`);
-  const json = await res.json();
-  return (json.items ?? []).map((i) => ({
-    video: i.id.videoId,
-    title: unescape(i.snippet.title),
-    published: i.snippet.publishedAt,
-    live: true,
-  }));
+  const api = async (what, q) => {
+    const res = await fetch(
+      `https://www.googleapis.com/youtube/v3/${what}?${new URLSearchParams({ ...q, key })}`,
+    );
+    if (!res.ok) throw new Error(`YouTube API ${what}: HTTP ${res.status}`);
+    return res.json();
+  };
+  const ids = [];
+  let pageToken;
+  for (let page = 0; page < 4; page++) {
+    const list = await api('playlistItems', {
+      part: 'contentDetails',
+      playlistId: `UU${channel.slice(2)}`,
+      maxResults: '50',
+      ...(pageToken ? { pageToken } : {}),
+    });
+    ids.push(...(list.items ?? []).map((i) => i.contentDetails.videoId));
+    pageToken = list.nextPageToken;
+    if (!pageToken) break;
+  }
+  const live = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const videos = await api('videos', { part: 'snippet', id: ids.slice(i, i + 50).join(',') });
+    for (const v of videos.items ?? [])
+      if (v.snippet.liveBroadcastContent === 'live')
+        live.push({
+          video: v.id,
+          title: v.snippet.title,
+          published: v.snippet.publishedAt,
+          live: true,
+        });
+  }
+  return live;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
