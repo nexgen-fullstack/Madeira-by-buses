@@ -4423,6 +4423,11 @@ input[type='time'],
   position: relative;
   aspect-ratio: 16 / 9;
 }
+.webcam-player__frame--page {
+  aspect-ratio: auto;
+  height: min(70vh, 640px);
+  background: #fff;
+}
 .webcam-player__frame iframe {
   position: absolute;
   inset: 0;

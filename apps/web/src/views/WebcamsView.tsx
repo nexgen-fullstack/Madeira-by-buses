@@ -33,8 +33,11 @@ export function WebcamsView({ route }: { route: Route }) {
   }, []);
   const openId = route.query.get('c');
   const open = WEBCAMS.find((c) => c.id === openId);
+  // Live on YouTube: its player here. Netmadeira's cameras without one: their own page here,
+  // with its picture of a minute ago (they keep the pictures to their site). Else their page.
+  const inApp = (c: Webcam) => Boolean(live[c.id]) || c.provider === 'netmadeira';
   const show = (c: Webcam) => {
-    if (live[c.id]) navigate('webcams', { c: c.id });
+    if (inApp(c)) navigate('webcams', { c: c.id });
     else window.open(c.page, '_blank', 'noopener');
   };
   // The phone's back button closes the player first.
@@ -84,25 +87,37 @@ export function WebcamsView({ route }: { route: Route }) {
       <h2 className="weather__title">
         <Video size={20} aria-hidden /> {t.t('layers.webcams')}
       </h2>
-      {open && live[open.id] && (
+      {open && inApp(open) && (
         <section className="webcam-player" aria-label={open.name}>
-          <div className="webcam-player__frame">
-            <iframe
-              src={playerUrl(live[open.id]!.video)}
-              title={open.name}
-              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
-          </div>
+          {live[open.id] ? (
+            <div className="webcam-player__frame">
+              <iframe
+                src={playerUrl(live[open.id]!.video)}
+                title={open.name}
+                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
+              />
+            </div>
+          ) : (
+            <div className="webcam-player__frame webcam-player__frame--page">
+              <iframe src={open.page} title={open.name} />
+            </div>
+          )}
           <div className="webcam-player__bar">
             <div>
               <div className="strong">{open.name}</div>
-              <div className="muted small">{providerName(open)} · YouTube</div>
+              <div className="muted small">
+                {providerName(open)} · {live[open.id] ? 'YouTube' : 'netmadeira.com'}
+              </div>
             </div>
             <a
               className="icon-button"
-              href={`https://www.youtube.com/watch?v=${live[open.id]!.video}`}
+              href={
+                live[open.id]
+                  ? `https://www.youtube.com/watch?v=${live[open.id]!.video}`
+                  : open.page
+              }
               target="_blank"
               rel="noopener noreferrer"
               aria-label="YouTube"
@@ -149,7 +164,7 @@ export function WebcamsView({ route }: { route: Route }) {
                   </span>
                   <span className="muted small">
                     {providerName(c)}
-                    {!now && (
+                    {!inApp(c) && (
                       <>
                         {' · '}
                         <ExternalLink size={11} aria-hidden />
