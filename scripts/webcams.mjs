@@ -111,7 +111,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const videos = [];
     if (key) {
       try {
-        videos.push(...(await liveNow(channel, key)));
+        const now = await liveNow(channel, key);
+        console.log(`${provider}: ${now.length} broadcasts live now (YouTube Data API)`);
+        for (const v of now) console.log(`  ${v.video} ${v.title}`);
+        videos.push(...now);
         answered++;
       } catch (e) {
         console.log(`! ${provider}: ${e.message}`);
@@ -130,7 +133,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       if (camera && !live[camera.id]) live[camera.id] = { video: v.video, title: v.title };
     }
   }
-  if (answered === 0) {
+  // Nothing heard, or nothing found: the file stays as it was rather than empty.
+  if (answered === 0 || Object.keys(live).length === 0) {
     console.log('No feed answered; the webcams file stays as it was');
     process.exit(0);
   }
