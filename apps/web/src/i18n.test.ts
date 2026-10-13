@@ -46,6 +46,8 @@ describe('translations', () => {
     expect(makeI18n('de').tn('it.transfers', 1)).toBe('1 Umstieg');
     expect(makeI18n('fr').tn('it.transfers', 1)).toBe('1 correspondance');
     expect(makeI18n('fr').tn('it.transfers', 2)).toBe('2 correspondances');
+    expect(makeI18n('nl').tn('it.transfers', 1)).toBe('1 overstap');
+    expect(makeI18n('nl').tn('it.transfers', 2)).toBe('2 overstappen');
   });
 });
 
@@ -56,7 +58,9 @@ describe('detectLang', () => {
     expect(detectLang(['ru-RU', 'uk'])).toBe('ru');
     expect(detectLang(['fr-FR', 'es-ES'])).toBe('fr');
     expect(detectLang(['fr-CA'])).toBe('fr');
-    expect(detectLang(['nl-NL', 'es-ES'])).toBe('es');
+    expect(detectLang(['nl-NL', 'es-ES'])).toBe('nl');
+    expect(detectLang(['nl-BE'])).toBe('nl');
+    expect(detectLang(['sv-SE', 'es-ES'])).toBe('es');
     expect(detectLang(['ja-JP'])).toBe('en');
     expect(detectLang([])).toBe('en');
   });

@@ -199,6 +199,8 @@ export interface Itinerary {
   alternative?: boolean;
   /** The best option's buses with a bus instead of its long walk to or from them. */
   lessWalking?: boolean;
+  /** A longer walk to or from the buses for fewer changes of bus, there about as soon. */
+  fewerChanges?: boolean;
 }
 
 interface Access {
@@ -229,6 +231,8 @@ const STREET_ALLOWANCE = 1.35;
 const LONG_WAIT = 15 * 60;
 /** How much sooner a trip with a long walk must get there to be offered besides the best (s). */
 const SOONER = 5 * 60;
+/** How much later a trip with a long walk and fewer changes may get there and be offered (s). */
+const FEWER_LATER = 15 * 60;
 /** Walking all the way is always offered up to this far along the streets (m)… */
 const WALK_ALWAYS = 2000;
 /** …and up to this far when no bus gets there sooner (m). */
@@ -396,6 +400,8 @@ export class Planner {
       ? [top, ...pareto.filter((it) => it !== top).sort(byArrival)].slice(0, ctx.opts.maxResults)
       : [];
     if (scenic && !main.includes(scenic)) main.push(scenic);
+    // A longer walk for fewer changes is a choice of its own, never cut off the list.
+    main.push(...results.filter((it) => it.fewerChanges && !main.includes(it)));
     main.push(...this.lessWalking(request, ctx, main));
     const alternatives = this.alternatives(request, ctx, main);
     let best = main[0];
@@ -416,7 +422,19 @@ export class Planner {
       .map((it) => this.refine(this.changeAtStation(it, request, ctx), request, ctx.opts))
       .filter((it) => !seen.has(it.key) && Boolean(seen.add(it.key)))
       .map((it) => this.withPaths(it));
-    return finish(final, ctx.opts, byArrival);
+    const shown = finish(final, ctx.opts, byArrival);
+    // The longer walk for fewer changes against the best as finally shown: fewer changes
+    // than it, and there about as soon.
+    const first = shown[0];
+    return shown.filter(
+      (it) =>
+        !it.fewerChanges ||
+        it === first ||
+        (first !== undefined &&
+          it.transfers < first.transfers &&
+          it.arrive <= first.arrive + FEWER_LATER &&
+          fareOf(it) <= fareOf(first)),
+    );
   }
 
   /**
@@ -513,10 +531,32 @@ export class Planner {
     // not much later: the one bus and the walk down, besides two buses to the door.
     const fare = Math.min(...byBus.map(fareOf));
     const latest = best ? best.arrive + Math.max(45 * 60, best.duration * 0.5) : Infinity;
+    const byCost = (a: Itinerary, b: Itinerary) => itineraryCost(a, opts) - itineraryCost(b, opts);
     const thrifty = fresh
       .filter((it) => !offered.includes(it) && fareOf(it) < fare && it.arrive <= latest)
-      .sort((a, b) => itineraryCost(a, opts) - itineraryCost(b, opts))[0];
-    return thrifty ? [...offered, thrifty] : offered;
+      .sort(byCost)[0];
+    // And a way with fewer changes, long walk and all, that gets there about as soon for no
+    // more: along the sea from Tabua to Ribeira Brava's bus station and the 200 straight to
+    // Funchal, besides the 323 there and a change to the same 200. Every best option with a
+    // change of bus is checked so, all over the island.
+    const fewer =
+      best && best.transfers > 0
+        ? fresh
+            .filter(
+              (it) =>
+                !offered.includes(it) &&
+                it !== thrifty &&
+                it.transfers < best.transfers &&
+                it.arrive <= best.arrive + FEWER_LATER &&
+                fareOf(it) <= fareOf(best),
+            )
+            .sort((a, b) => a.transfers - b.transfers || byCost(a, b))[0]
+        : undefined;
+    return [
+      ...offered,
+      ...(thrifty ? [thrifty] : []),
+      ...(fewer ? [{ ...fewer, fewerChanges: true }] : []),
+    ];
   }
 
   /**
@@ -2068,7 +2108,11 @@ function finish(
   const all = [best, ...rest];
   const others = rest.filter(
     (it) =>
-      it.alternative || it.lessWalking || isScenicWalk(it) || !all.some((b) => paretoBeats(b, it)),
+      it.alternative ||
+      it.lessWalking ||
+      it.fewerChanges ||
+      isScenicWalk(it) ||
+      !all.some((b) => paretoBeats(b, it)),
   );
   // A walk with a view comes right after the best, whenever it would go: it is a choice of
   // its own, not one more departure.

@@ -58,6 +58,10 @@ export const cs: Dict = {
   'it.fastest': 'Nejrychlejší',
   'it.cheapest': 'Nejlevnější',
   'it.lessWalking': 'Méně pěšky',
+  'it.walkNoChange': 'Pěšky, bez přestupu',
+  'it.walkFewerChanges': 'Pěšky, méně přestupů',
+  'it.walkChangeHint':
+    'Delší chůze k autobusu (nebo od něj), zato bez přestupu navíc a na místě skoro stejně brzy',
   'it.express': 'Expres · Via Rápida',
   'it.expressHint': 'Expresní autobus po Via Rápida: méně zastávek, kratší jízda',
   'vr.title': 'Po Via Rápida',

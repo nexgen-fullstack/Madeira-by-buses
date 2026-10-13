@@ -53,7 +53,7 @@ Plan door-to-door bus trips around Madeira on your phone, even without internet.
 • Line timetables from any stop on any date, and A4 timetables to print or share as PDF.
 • Departures nearby, saved stops and recent trips.
 • Map, satellite and terrain layers with 3D mountains.
-• 10 languages: English, Português, Українська, Español, Français, Italiano, Deutsch, Čeština, Polski, Русский.
+• 11 languages: English, Português, Українська, Español, Français, Italiano, Deutsch, Nederlands, Čeština, Polski, Русский.
 • Private by design: your location never leaves your phone. No account, no ads, no tracking.
 
 Madeira by busses is an independent app, not affiliated with SIGA, Horários do Funchal, CAM, Rodoeste or the Regional Government of Madeira. Timetables come from the operators' public data.
@@ -95,7 +95,7 @@ Madeira by busses — подорожуйте Мадейрою легко.
 • Розклад лінії від будь-якої зупинки на будь-яку дату й розклади A4 для друку чи надсилання в PDF.
 • Відправлення поруч, збережені зупинки й нещодавні поїздки.
 • Карта, супутник і рельєф із 3D-горами.
-• 10 мов.
+• 11 мов.
 • Приватність: геопозиція не залишає телефон. Без облікового запису, реклами й стеження.
 
 Madeira by busses — незалежний застосунок, не пов'язаний із SIGA, Horários do Funchal, CAM, Rodoeste чи урядом Мадейри. Розклади — з відкритих даних перевізників.

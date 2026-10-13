@@ -1,0 +1,18 @@
+Copyright (c) 2026 nexgen-fullstack — Madeira by busses. All rights reserved.
+
+The source code, design, logo, name, texts, translations and compiled builds of
+Madeira by busses (the website and the Android app) are proprietary.
+
+No permission is granted to copy, modify, publish, distribute, sublicense,
+re-host, sell or otherwise use any part of them, in whole or in part, in source
+or compiled form, nor to build other works on them, without the prior written
+permission of the copyright holder. Being able to read this repository grants
+no licence of any kind.
+
+Third-party material keeps its own licence and is not covered by the above:
+map data © OpenStreetMap contributors (ODbL), Overture Maps places (CDLA
+Permissive 2.0), photographs from Wikimedia Commons (each under the licence
+named with it in the app), timetables and stops of the bus operators,
+weather from Open-Meteo (CC BY 4.0) and IPMA, imagery © Esri and its partners,
+basemap tiles by OpenFreeMap, and the open-source libraries listed in the
+package files under their own licences.

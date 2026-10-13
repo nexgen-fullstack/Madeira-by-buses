@@ -1,4 +1,9 @@
-import type { LayerSpecification, SourceSpecification, StyleSpecification } from 'maplibre-gl';
+import type {
+  FilterSpecification,
+  LayerSpecification,
+  SourceSpecification,
+  StyleSpecification,
+} from 'maplibre-gl';
 import type { Lang } from '../i18n.ts';
 
 /**
@@ -105,7 +110,7 @@ const TERRAIN_TILES = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{
 const TERRAIN_ATTRIBUTION =
   'Elevation: <a href="https://registry.opendata.aws/terrain-tiles/">Terrain Tiles</a> (SRTM, EU-DEM and others)';
 
-const SEA = '#a8d1e7';
+const SEA = '#9fdde4';
 
 export function demSource(): SourceSpecification {
   return {
@@ -171,7 +176,7 @@ function reliefLayers(): LayerSpecification[] {
           0,
           SEA,
           0.5,
-          'rgba(168, 209, 231, 0)',
+          'rgba(159, 221, 228, 0)',
         ],
       },
     },
@@ -200,10 +205,71 @@ export const SATELLITE_CLOSE_PAINT = {
   'raster-fade-duration': 120,
 } as const;
 
+/**
+ * The sea of a resort: turquoise rather than the near-black of the deep ocean in the
+ * imagery. Laid over the imagery along the coastline of the vector tiles, strong with the
+ * whole island in view and fainter close in, where the surf and the beaches show through.
+ */
+export const RESORT_SEA = '#1fc3d0';
+/** The sea before its tiles come, and wherever there are none. */
+const RESORT_SEA_DEEP = '#178fa6';
+/** The sea of the plain map, a lighter turquoise. */
+const RESORT_SEA_MAP = '#8fdbe3';
+
+/** Water that is sea, a lake, a reservoir or a pool — not a river bed (dry most of the year). */
+const STANDING_WATER: FilterSpecification = [
+  'all',
+  ['!=', ['get', 'brunnel'], 'tunnel'],
+  ['!=', ['get', 'class'], 'river'],
+];
+
+function resortSea(source: string): LayerSpecification {
+  return {
+    id: 'mb-resort-sea',
+    type: 'fill',
+    source,
+    'source-layer': 'water',
+    filter: STANDING_WATER,
+    paint: {
+      'fill-color': RESORT_SEA,
+      'fill-antialias': false,
+      'fill-opacity': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        6,
+        0.85,
+        11,
+        0.74,
+        14,
+        0.5,
+        16,
+        0.3,
+        18,
+        0.14,
+      ],
+    },
+  } as LayerSpecification;
+}
+
+/** The plain map's water in the resort's turquoise rather than the style's lavender blue. */
+export function withResortWater(style: StyleSpecification): StyleSpecification {
+  return {
+    ...style,
+    layers: style.layers.map((l) =>
+      l.type === 'fill' && sourceLayer(l) === 'water'
+        ? ({ ...l, paint: { ...l.paint, 'fill-color': RESORT_SEA_MAP } } as LayerSpecification)
+        : l.type === 'line' && sourceLayer(l) === 'waterway'
+          ? ({ ...l, paint: { ...l.paint, 'line-color': RESORT_SEA_MAP } } as LayerSpecification)
+          : l,
+    ),
+  };
+}
+
 function satelliteLayers(): LayerSpecification[] {
   const handOver = satelliteSwitch(satelliteTileSize());
   return [
-    { id: 'mb-background', type: 'background', paint: { 'background-color': '#1f3445' } },
+    { id: 'mb-background', type: 'background', paint: { 'background-color': RESORT_SEA_DEEP } },
     // Under the sharp imagery, the same in tiles four times as large (a sixteenth of the
     // requests): there at once on a slow phone, so a place newly in view is never a dark
     // hole while its sharp tiles come.
@@ -285,7 +351,9 @@ export function overlayVector(
   base: Exclude<BaseLayer, 'map'>,
 ): StyleSpecification {
   const keepLines = new Set(['transportation', 'boundary', 'aeroway']);
-  const kept: LayerSpecification[] = [];
+  const water = vector.layers.find((l) => l.type === 'fill' && sourceLayer(l) === 'water');
+  const kept: LayerSpecification[] =
+    base === 'satellite' && water && 'source' in water ? [resortSea(water.source)] : [];
   for (const layer of vector.layers) {
     if (layer.type === 'symbol' || layer.type === 'fill-extrusion') {
       kept.push(base === 'satellite' && layer.type === 'symbol' ? brightText(layer) : layer);
@@ -433,7 +501,9 @@ async function fetchVectorStyle(): Promise<StyleSpecification> {
   try {
     const res = await fetch(VECTOR_STYLE, { signal: ctrl.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return withoutClutter(withHouseNumbers((await res.json()) as StyleSpecification));
+    return withResortWater(
+      withoutClutter(withHouseNumbers((await res.json()) as StyleSpecification)),
+    );
   } finally {
     clearTimeout(timer);
   }
@@ -493,56 +563,56 @@ export function extrusionLayer(source: string, satellite: boolean): LayerSpecifi
 /** Human label for an OpenMapTiles POI class/subclass, in every app language. */
 // prettier-ignore
 const POI_LABELS: Record<string, Record<Lang, string>> = {
-  town: { uk: 'Місто', en: 'Town', pt: 'Cidade', es: 'Ciudad', fr: 'Ville', it: 'Città', de: 'Stadt', cs: 'Město', pl: 'Miasto', ru: 'Город' },
-  village: { uk: 'Селище', en: 'Village', pt: 'Localidade', es: 'Pueblo', fr: 'Village', it: 'Paese', de: 'Ort', cs: 'Obec', pl: 'Miejscowość', ru: 'Посёлок' },
-  locality: { uk: 'Місцевість', en: 'Locality', pt: 'Sítio', es: 'Paraje', fr: 'Lieu-dit', it: 'Località', de: 'Ortsteil', cs: 'Místo', pl: 'Okolica', ru: 'Местность' },
-  cable_car: { uk: 'Канатна дорога', en: 'Cable car', pt: 'Teleférico', es: 'Teleférico', fr: 'Téléphérique', it: 'Funivia', de: 'Seilbahn', cs: 'Lanovka', pl: 'Kolejka linowa', ru: 'Канатная дорога' },
-  marketplace: { uk: 'Ринок', en: 'Market', pt: 'Mercado', es: 'Mercado', fr: 'Marché', it: 'Mercato', de: 'Markt', cs: 'Tržnice', pl: 'Targ', ru: 'Рынок' },
-  mall: { uk: 'Торговий центр', en: 'Shopping centre', pt: 'Centro comercial', es: 'Centro comercial', fr: 'Centre commercial', it: 'Centro commerciale', de: 'Einkaufszentrum', cs: 'Obchodní centrum', pl: 'Centrum handlowe', ru: 'Торговый центр' },
-  peak: { uk: 'Вершина', en: 'Peak', pt: 'Pico', es: 'Pico', fr: 'Sommet', it: 'Vetta', de: 'Gipfel', cs: 'Vrchol', pl: 'Szczyt', ru: 'Вершина' },
-  nature: { uk: 'Природа', en: 'Nature', pt: 'Natureza', es: 'Naturaleza', fr: 'Nature', it: 'Natura', de: 'Natur', cs: 'Příroda', pl: 'Przyroda', ru: 'Природа' },
-  trailhead: { uk: 'Початок стежки', en: 'Trailhead', pt: 'Início de trilho', es: 'Inicio de sendero', fr: 'Départ de sentier', it: 'Inizio sentiero', de: 'Wanderweg-Start', cs: 'Začátek stezky', pl: 'Początek szlaku', ru: 'Начало тропы' },
-  historic: { uk: 'Пам’ятка', en: 'Landmark', pt: 'Monumento', es: 'Monumento', fr: 'Monument', it: 'Monumento', de: 'Sehenswürdigkeit', cs: 'Památka', pl: 'Zabytek', ru: 'Достопримечательность' },
-  hospital: { uk: 'Лікарня', en: 'Hospital', pt: 'Hospital', es: 'Hospital', fr: 'Hôpital', it: 'Ospedale', de: 'Krankenhaus', cs: 'Nemocnice', pl: 'Szpital', ru: 'Больница' },
-  pharmacy: { uk: 'Аптека', en: 'Pharmacy', pt: 'Farmácia', es: 'Farmacia', fr: 'Pharmacie', it: 'Farmacia', de: 'Apotheke', cs: 'Lékárna', pl: 'Apteka', ru: 'Аптека' },
-  school: { uk: 'Школа', en: 'School', pt: 'Escola', es: 'Escuela', fr: 'École', it: 'Scuola', de: 'Schule', cs: 'Škola', pl: 'Szkoła', ru: 'Школа' },
-  college: { uk: 'Навчальний заклад', en: 'College', pt: 'Ensino', es: 'Centro educativo', fr: 'Établissement d’enseignement', it: 'Istituto', de: 'Hochschule', cs: 'Vysoká škola', pl: 'Uczelnia', ru: 'Учебное заведение' },
-  bank: { uk: 'Банк', en: 'Bank', pt: 'Banco', es: 'Banco', fr: 'Banque', it: 'Banca', de: 'Bank', cs: 'Banka', pl: 'Bank', ru: 'Банк' },
-  atm: { uk: 'Банкомат', en: 'ATM', pt: 'Multibanco', es: 'Cajero', fr: 'Distributeur', it: 'Bancomat', de: 'Geldautomat', cs: 'Bankomat', pl: 'Bankomat', ru: 'Банкомат' },
-  lodging: { uk: 'Житло', en: 'Accommodation', pt: 'Alojamento', es: 'Alojamiento', fr: 'Hébergement', it: 'Alloggio', de: 'Unterkunft', cs: 'Ubytování', pl: 'Nocleg', ru: 'Жильё' },
-  hotel: { uk: 'Готель', en: 'Hotel', pt: 'Hotel', es: 'Hotel', fr: 'Hôtel', it: 'Hotel', de: 'Hotel', cs: 'Hotel', pl: 'Hotel', ru: 'Отель' },
-  restaurant: { uk: 'Ресторан', en: 'Restaurant', pt: 'Restaurante', es: 'Restaurante', fr: 'Restaurant', it: 'Ristorante', de: 'Restaurant', cs: 'Restaurace', pl: 'Restauracja', ru: 'Ресторан' },
-  cafe: { uk: 'Кафе', en: 'Café', pt: 'Café', es: 'Cafetería', fr: 'Café', it: 'Caffè', de: 'Café', cs: 'Kavárna', pl: 'Kawiarnia', ru: 'Кафе' },
-  bar: { uk: 'Бар', en: 'Bar', pt: 'Bar', es: 'Bar', fr: 'Bar', it: 'Bar', de: 'Bar', cs: 'Bar', pl: 'Bar', ru: 'Бар' },
-  fast_food: { uk: 'Фастфуд', en: 'Fast food', pt: 'Comida rápida', es: 'Comida rápida', fr: 'Restauration rapide', it: 'Fast food', de: 'Schnellimbiss', cs: 'Rychlé občerstvení', pl: 'Fast food', ru: 'Фастфуд' },
-  shop: { uk: 'Магазин', en: 'Shop', pt: 'Loja', es: 'Tienda', fr: 'Magasin', it: 'Negozio', de: 'Geschäft', cs: 'Obchod', pl: 'Sklep', ru: 'Магазин' },
-  grocery: { uk: 'Продукти', en: 'Grocery', pt: 'Mercearia', es: 'Alimentación', fr: 'Épicerie', it: 'Alimentari', de: 'Lebensmittel', cs: 'Potraviny', pl: 'Sklep spożywczy', ru: 'Продукты' },
-  supermarket: { uk: 'Супермаркет', en: 'Supermarket', pt: 'Supermercado', es: 'Supermercado', fr: 'Supermarché', it: 'Supermercato', de: 'Supermarkt', cs: 'Supermarket', pl: 'Supermarket', ru: 'Супермаркет' },
-  town_hall: { uk: 'Ратуша', en: 'Town hall', pt: 'Câmara Municipal', es: 'Ayuntamiento', fr: 'Mairie', it: 'Municipio', de: 'Rathaus', cs: 'Radnice', pl: 'Ratusz', ru: 'Мэрия' },
-  police: { uk: 'Поліція', en: 'Police', pt: 'Polícia', es: 'Policía', fr: 'Police', it: 'Polizia', de: 'Polizei', cs: 'Policie', pl: 'Policja', ru: 'Полиция' },
-  post: { uk: 'Пошта', en: 'Post office', pt: 'Correios', es: 'Correos', fr: 'Poste', it: 'Posta', de: 'Post', cs: 'Pošta', pl: 'Poczta', ru: 'Почта' },
-  museum: { uk: 'Музей', en: 'Museum', pt: 'Museu', es: 'Museo', fr: 'Musée', it: 'Museo', de: 'Museum', cs: 'Muzeum', pl: 'Muzeum', ru: 'Музей' },
-  attraction: { uk: 'Пам’ятка', en: 'Attraction', pt: 'Atração', es: 'Atracción', fr: 'Attraction', it: 'Attrazione', de: 'Sehenswürdigkeit', cs: 'Atrakce', pl: 'Atrakcja', ru: 'Достопримечательность' },
-  place_of_worship: { uk: 'Храм', en: 'Place of worship', pt: 'Igreja', es: 'Lugar de culto', fr: 'Lieu de culte', it: 'Luogo di culto', de: 'Gotteshaus', cs: 'Kostel', pl: 'Świątynia', ru: 'Храм' },
-  bus: { uk: 'Зупинка', en: 'Bus stop', pt: 'Paragem', es: 'Parada de autobús', fr: 'Arrêt de bus', it: 'Fermata', de: 'Bushaltestelle', cs: 'Zastávka', pl: 'Przystanek', ru: 'Остановка' },
-  fuel: { uk: 'АЗС', en: 'Fuel', pt: 'Combustível', es: 'Gasolinera', fr: 'Station-service', it: 'Distributore', de: 'Tankstelle', cs: 'Čerpací stanice', pl: 'Stacja paliw', ru: 'АЗС' },
-  park: { uk: 'Парк', en: 'Park', pt: 'Parque', es: 'Parque', fr: 'Parc', it: 'Parco', de: 'Park', cs: 'Park', pl: 'Park', ru: 'Парк' },
-  beach: { uk: 'Пляж', en: 'Beach', pt: 'Praia', es: 'Playa', fr: 'Plage', it: 'Spiaggia', de: 'Strand', cs: 'Pláž', pl: 'Plaża', ru: 'Пляж' },
-  aerodrome: { uk: 'Аеропорт', en: 'Airport', pt: 'Aeroporto', es: 'Aeropuerto', fr: 'Aéroport', it: 'Aeroporto', de: 'Flughafen', cs: 'Letiště', pl: 'Lotnisko', ru: 'Аэропорт' },
-  harbor: { uk: 'Порт', en: 'Harbour', pt: 'Porto', es: 'Puerto', fr: 'Port', it: 'Porto', de: 'Hafen', cs: 'Přístav', pl: 'Port', ru: 'Порт' },
-  ferry_terminal: { uk: 'Пором', en: 'Ferry', pt: 'Ferry', es: 'Ferry', fr: 'Ferry', it: 'Traghetto', de: 'Fähre', cs: 'Trajekt', pl: 'Prom', ru: 'Паром' },
-  doctors: { uk: 'Лікар', en: 'Doctor', pt: 'Médico', es: 'Médico', fr: 'Médecin', it: 'Medico', de: 'Arztpraxis', cs: 'Lékař', pl: 'Lekarz', ru: 'Врач' },
-  dentist: { uk: 'Стоматолог', en: 'Dentist', pt: 'Dentista', es: 'Dentista', fr: 'Dentiste', it: 'Dentista', de: 'Zahnarzt', cs: 'Zubař', pl: 'Dentysta', ru: 'Стоматолог' },
-  library: { uk: 'Бібліотека', en: 'Library', pt: 'Biblioteca', es: 'Biblioteca', fr: 'Bibliothèque', it: 'Biblioteca', de: 'Bibliothek', cs: 'Knihovna', pl: 'Biblioteka', ru: 'Библиотека' },
-  cinema: { uk: 'Кінотеатр', en: 'Cinema', pt: 'Cinema', es: 'Cine', fr: 'Cinéma', it: 'Cinema', de: 'Kino', cs: 'Kino', pl: 'Kino', ru: 'Кинотеатр' },
-  theatre: { uk: 'Театр', en: 'Theatre', pt: 'Teatro', es: 'Teatro', fr: 'Théâtre', it: 'Teatro', de: 'Theater', cs: 'Divadlo', pl: 'Teatr', ru: 'Театр' },
-  stadium: { uk: 'Стадіон', en: 'Stadium', pt: 'Estádio', es: 'Estadio', fr: 'Stade', it: 'Stadio', de: 'Stadion', cs: 'Stadion', pl: 'Stadion', ru: 'Стадион' },
-  gallery: { uk: 'Галерея', en: 'Gallery', pt: 'Galeria', es: 'Galería', fr: 'Galerie', it: 'Galleria', de: 'Galerie', cs: 'Galerie', pl: 'Galeria', ru: 'Галерея' },
-  monument: { uk: 'Пам’ятник', en: 'Monument', pt: 'Monumento', es: 'Monumento', fr: 'Monument', it: 'Monumento', de: 'Denkmal', cs: 'Pomník', pl: 'Pomnik', ru: 'Памятник' },
-  castle: { uk: 'Фортеця', en: 'Fort', pt: 'Forte', es: 'Fuerte', fr: 'Fort', it: 'Forte', de: 'Festung', cs: 'Pevnost', pl: 'Twierdza', ru: 'Крепость' },
-  bakery: { uk: 'Пекарня', en: 'Bakery', pt: 'Padaria', es: 'Panadería', fr: 'Boulangerie', it: 'Panetteria', de: 'Bäckerei', cs: 'Pekárna', pl: 'Piekarnia', ru: 'Пекарня' },
-  ice_cream: { uk: 'Морозиво', en: 'Ice cream', pt: 'Gelataria', es: 'Heladería', fr: 'Glacier', it: 'Gelateria', de: 'Eisdiele', cs: 'Zmrzlinárna', pl: 'Lodziarnia', ru: 'Мороженое' },
-  viewpoint: { uk: 'Оглядовий майданчик', en: 'Viewpoint', pt: 'Miradouro', es: 'Mirador', fr: 'Point de vue', it: 'Belvedere', de: 'Aussichtspunkt', cs: 'Vyhlídka', pl: 'Punkt widokowy', ru: 'Смотровая площадка' },
+  town: { uk: 'Місто', en: 'Town', pt: 'Cidade', es: 'Ciudad', fr: 'Ville', it: 'Città', de: 'Stadt', nl: 'Stad', cs: 'Město', pl: 'Miasto', ru: 'Город' },
+  village: { uk: 'Селище', en: 'Village', pt: 'Localidade', es: 'Pueblo', fr: 'Village', it: 'Paese', de: 'Ort', nl: 'Dorp', cs: 'Obec', pl: 'Miejscowość', ru: 'Посёлок' },
+  locality: { uk: 'Місцевість', en: 'Locality', pt: 'Sítio', es: 'Paraje', fr: 'Lieu-dit', it: 'Località', de: 'Ortsteil', nl: 'Buurtschap', cs: 'Místo', pl: 'Okolica', ru: 'Местность' },
+  cable_car: { uk: 'Канатна дорога', en: 'Cable car', pt: 'Teleférico', es: 'Teleférico', fr: 'Téléphérique', it: 'Funivia', de: 'Seilbahn', nl: 'Kabelbaan', cs: 'Lanovka', pl: 'Kolejka linowa', ru: 'Канатная дорога' },
+  marketplace: { uk: 'Ринок', en: 'Market', pt: 'Mercado', es: 'Mercado', fr: 'Marché', it: 'Mercato', de: 'Markt', nl: 'Markt', cs: 'Tržnice', pl: 'Targ', ru: 'Рынок' },
+  mall: { uk: 'Торговий центр', en: 'Shopping centre', pt: 'Centro comercial', es: 'Centro comercial', fr: 'Centre commercial', it: 'Centro commerciale', de: 'Einkaufszentrum', nl: 'Winkelcentrum', cs: 'Obchodní centrum', pl: 'Centrum handlowe', ru: 'Торговый центр' },
+  peak: { uk: 'Вершина', en: 'Peak', pt: 'Pico', es: 'Pico', fr: 'Sommet', it: 'Vetta', de: 'Gipfel', nl: 'Top', cs: 'Vrchol', pl: 'Szczyt', ru: 'Вершина' },
+  nature: { uk: 'Природа', en: 'Nature', pt: 'Natureza', es: 'Naturaleza', fr: 'Nature', it: 'Natura', de: 'Natur', nl: 'Natuur', cs: 'Příroda', pl: 'Przyroda', ru: 'Природа' },
+  trailhead: { uk: 'Початок стежки', en: 'Trailhead', pt: 'Início de trilho', es: 'Inicio de sendero', fr: 'Départ de sentier', it: 'Inizio sentiero', de: 'Wanderweg-Start', nl: 'Begin van wandelpad', cs: 'Začátek stezky', pl: 'Początek szlaku', ru: 'Начало тропы' },
+  historic: { uk: 'Пам’ятка', en: 'Landmark', pt: 'Monumento', es: 'Monumento', fr: 'Monument', it: 'Monumento', de: 'Sehenswürdigkeit', nl: 'Bezienswaardigheid', cs: 'Památka', pl: 'Zabytek', ru: 'Достопримечательность' },
+  hospital: { uk: 'Лікарня', en: 'Hospital', pt: 'Hospital', es: 'Hospital', fr: 'Hôpital', it: 'Ospedale', de: 'Krankenhaus', nl: 'Ziekenhuis', cs: 'Nemocnice', pl: 'Szpital', ru: 'Больница' },
+  pharmacy: { uk: 'Аптека', en: 'Pharmacy', pt: 'Farmácia', es: 'Farmacia', fr: 'Pharmacie', it: 'Farmacia', de: 'Apotheke', nl: 'Apotheek', cs: 'Lékárna', pl: 'Apteka', ru: 'Аптека' },
+  school: { uk: 'Школа', en: 'School', pt: 'Escola', es: 'Escuela', fr: 'École', it: 'Scuola', de: 'Schule', nl: 'School', cs: 'Škola', pl: 'Szkoła', ru: 'Школа' },
+  college: { uk: 'Навчальний заклад', en: 'College', pt: 'Ensino', es: 'Centro educativo', fr: 'Établissement d’enseignement', it: 'Istituto', de: 'Hochschule', nl: 'Onderwijsinstelling', cs: 'Vysoká škola', pl: 'Uczelnia', ru: 'Учебное заведение' },
+  bank: { uk: 'Банк', en: 'Bank', pt: 'Banco', es: 'Banco', fr: 'Banque', it: 'Banca', de: 'Bank', nl: 'Bank', cs: 'Banka', pl: 'Bank', ru: 'Банк' },
+  atm: { uk: 'Банкомат', en: 'ATM', pt: 'Multibanco', es: 'Cajero', fr: 'Distributeur', it: 'Bancomat', de: 'Geldautomat', nl: 'Geldautomaat', cs: 'Bankomat', pl: 'Bankomat', ru: 'Банкомат' },
+  lodging: { uk: 'Житло', en: 'Accommodation', pt: 'Alojamento', es: 'Alojamiento', fr: 'Hébergement', it: 'Alloggio', de: 'Unterkunft', nl: 'Accommodatie', cs: 'Ubytování', pl: 'Nocleg', ru: 'Жильё' },
+  hotel: { uk: 'Готель', en: 'Hotel', pt: 'Hotel', es: 'Hotel', fr: 'Hôtel', it: 'Hotel', de: 'Hotel', nl: 'Hotel', cs: 'Hotel', pl: 'Hotel', ru: 'Отель' },
+  restaurant: { uk: 'Ресторан', en: 'Restaurant', pt: 'Restaurante', es: 'Restaurante', fr: 'Restaurant', it: 'Ristorante', de: 'Restaurant', nl: 'Restaurant', cs: 'Restaurace', pl: 'Restauracja', ru: 'Ресторан' },
+  cafe: { uk: 'Кафе', en: 'Café', pt: 'Café', es: 'Cafetería', fr: 'Café', it: 'Caffè', de: 'Café', nl: 'Café', cs: 'Kavárna', pl: 'Kawiarnia', ru: 'Кафе' },
+  bar: { uk: 'Бар', en: 'Bar', pt: 'Bar', es: 'Bar', fr: 'Bar', it: 'Bar', de: 'Bar', nl: 'Bar', cs: 'Bar', pl: 'Bar', ru: 'Бар' },
+  fast_food: { uk: 'Фастфуд', en: 'Fast food', pt: 'Comida rápida', es: 'Comida rápida', fr: 'Restauration rapide', it: 'Fast food', de: 'Schnellimbiss', nl: 'Snackbar', cs: 'Rychlé občerstvení', pl: 'Fast food', ru: 'Фастфуд' },
+  shop: { uk: 'Магазин', en: 'Shop', pt: 'Loja', es: 'Tienda', fr: 'Magasin', it: 'Negozio', de: 'Geschäft', nl: 'Winkel', cs: 'Obchod', pl: 'Sklep', ru: 'Магазин' },
+  grocery: { uk: 'Продукти', en: 'Grocery', pt: 'Mercearia', es: 'Alimentación', fr: 'Épicerie', it: 'Alimentari', de: 'Lebensmittel', nl: 'Levensmiddelen', cs: 'Potraviny', pl: 'Sklep spożywczy', ru: 'Продукты' },
+  supermarket: { uk: 'Супермаркет', en: 'Supermarket', pt: 'Supermercado', es: 'Supermercado', fr: 'Supermarché', it: 'Supermercato', de: 'Supermarkt', nl: 'Supermarkt', cs: 'Supermarket', pl: 'Supermarket', ru: 'Супермаркет' },
+  town_hall: { uk: 'Ратуша', en: 'Town hall', pt: 'Câmara Municipal', es: 'Ayuntamiento', fr: 'Mairie', it: 'Municipio', de: 'Rathaus', nl: 'Gemeentehuis', cs: 'Radnice', pl: 'Ratusz', ru: 'Мэрия' },
+  police: { uk: 'Поліція', en: 'Police', pt: 'Polícia', es: 'Policía', fr: 'Police', it: 'Polizia', de: 'Polizei', nl: 'Politie', cs: 'Policie', pl: 'Policja', ru: 'Полиция' },
+  post: { uk: 'Пошта', en: 'Post office', pt: 'Correios', es: 'Correos', fr: 'Poste', it: 'Posta', de: 'Post', nl: 'Postkantoor', cs: 'Pošta', pl: 'Poczta', ru: 'Почта' },
+  museum: { uk: 'Музей', en: 'Museum', pt: 'Museu', es: 'Museo', fr: 'Musée', it: 'Museo', de: 'Museum', nl: 'Museum', cs: 'Muzeum', pl: 'Muzeum', ru: 'Музей' },
+  attraction: { uk: 'Пам’ятка', en: 'Attraction', pt: 'Atração', es: 'Atracción', fr: 'Attraction', it: 'Attrazione', de: 'Sehenswürdigkeit', nl: 'Attractie', cs: 'Atrakce', pl: 'Atrakcja', ru: 'Достопримечательность' },
+  place_of_worship: { uk: 'Храм', en: 'Place of worship', pt: 'Igreja', es: 'Lugar de culto', fr: 'Lieu de culte', it: 'Luogo di culto', de: 'Gotteshaus', nl: 'Gebedshuis', cs: 'Kostel', pl: 'Świątynia', ru: 'Храм' },
+  bus: { uk: 'Зупинка', en: 'Bus stop', pt: 'Paragem', es: 'Parada de autobús', fr: 'Arrêt de bus', it: 'Fermata', de: 'Bushaltestelle', nl: 'Bushalte', cs: 'Zastávka', pl: 'Przystanek', ru: 'Остановка' },
+  fuel: { uk: 'АЗС', en: 'Fuel', pt: 'Combustível', es: 'Gasolinera', fr: 'Station-service', it: 'Distributore', de: 'Tankstelle', nl: 'Tankstation', cs: 'Čerpací stanice', pl: 'Stacja paliw', ru: 'АЗС' },
+  park: { uk: 'Парк', en: 'Park', pt: 'Parque', es: 'Parque', fr: 'Parc', it: 'Parco', de: 'Park', nl: 'Park', cs: 'Park', pl: 'Park', ru: 'Парк' },
+  beach: { uk: 'Пляж', en: 'Beach', pt: 'Praia', es: 'Playa', fr: 'Plage', it: 'Spiaggia', de: 'Strand', nl: 'Strand', cs: 'Pláž', pl: 'Plaża', ru: 'Пляж' },
+  aerodrome: { uk: 'Аеропорт', en: 'Airport', pt: 'Aeroporto', es: 'Aeropuerto', fr: 'Aéroport', it: 'Aeroporto', de: 'Flughafen', nl: 'Luchthaven', cs: 'Letiště', pl: 'Lotnisko', ru: 'Аэропорт' },
+  harbor: { uk: 'Порт', en: 'Harbour', pt: 'Porto', es: 'Puerto', fr: 'Port', it: 'Porto', de: 'Hafen', nl: 'Haven', cs: 'Přístav', pl: 'Port', ru: 'Порт' },
+  ferry_terminal: { uk: 'Пором', en: 'Ferry', pt: 'Ferry', es: 'Ferry', fr: 'Ferry', it: 'Traghetto', de: 'Fähre', nl: 'Veerboot', cs: 'Trajekt', pl: 'Prom', ru: 'Паром' },
+  doctors: { uk: 'Лікар', en: 'Doctor', pt: 'Médico', es: 'Médico', fr: 'Médecin', it: 'Medico', de: 'Arztpraxis', nl: 'Huisarts', cs: 'Lékař', pl: 'Lekarz', ru: 'Врач' },
+  dentist: { uk: 'Стоматолог', en: 'Dentist', pt: 'Dentista', es: 'Dentista', fr: 'Dentiste', it: 'Dentista', de: 'Zahnarzt', nl: 'Tandarts', cs: 'Zubař', pl: 'Dentysta', ru: 'Стоматолог' },
+  library: { uk: 'Бібліотека', en: 'Library', pt: 'Biblioteca', es: 'Biblioteca', fr: 'Bibliothèque', it: 'Biblioteca', de: 'Bibliothek', nl: 'Bibliotheek', cs: 'Knihovna', pl: 'Biblioteka', ru: 'Библиотека' },
+  cinema: { uk: 'Кінотеатр', en: 'Cinema', pt: 'Cinema', es: 'Cine', fr: 'Cinéma', it: 'Cinema', de: 'Kino', nl: 'Bioscoop', cs: 'Kino', pl: 'Kino', ru: 'Кинотеатр' },
+  theatre: { uk: 'Театр', en: 'Theatre', pt: 'Teatro', es: 'Teatro', fr: 'Théâtre', it: 'Teatro', de: 'Theater', nl: 'Theater', cs: 'Divadlo', pl: 'Teatr', ru: 'Театр' },
+  stadium: { uk: 'Стадіон', en: 'Stadium', pt: 'Estádio', es: 'Estadio', fr: 'Stade', it: 'Stadio', de: 'Stadion', nl: 'Stadion', cs: 'Stadion', pl: 'Stadion', ru: 'Стадион' },
+  gallery: { uk: 'Галерея', en: 'Gallery', pt: 'Galeria', es: 'Galería', fr: 'Galerie', it: 'Galleria', de: 'Galerie', nl: 'Galerie', cs: 'Galerie', pl: 'Galeria', ru: 'Галерея' },
+  monument: { uk: 'Пам’ятник', en: 'Monument', pt: 'Monumento', es: 'Monumento', fr: 'Monument', it: 'Monumento', de: 'Denkmal', nl: 'Monument', cs: 'Pomník', pl: 'Pomnik', ru: 'Памятник' },
+  castle: { uk: 'Фортеця', en: 'Fort', pt: 'Forte', es: 'Fuerte', fr: 'Fort', it: 'Forte', de: 'Festung', nl: 'Fort', cs: 'Pevnost', pl: 'Twierdza', ru: 'Крепость' },
+  bakery: { uk: 'Пекарня', en: 'Bakery', pt: 'Padaria', es: 'Panadería', fr: 'Boulangerie', it: 'Panetteria', de: 'Bäckerei', nl: 'Bakkerij', cs: 'Pekárna', pl: 'Piekarnia', ru: 'Пекарня' },
+  ice_cream: { uk: 'Морозиво', en: 'Ice cream', pt: 'Gelataria', es: 'Heladería', fr: 'Glacier', it: 'Gelateria', de: 'Eisdiele', nl: 'IJssalon', cs: 'Zmrzlinárna', pl: 'Lodziarnia', ru: 'Мороженое' },
+  viewpoint: { uk: 'Оглядовий майданчик', en: 'Viewpoint', pt: 'Miradouro', es: 'Mirador', fr: 'Point de vue', it: 'Belvedere', de: 'Aussichtspunkt', nl: 'Uitkijkpunt', cs: 'Vyhlídka', pl: 'Punkt widokowy', ru: 'Смотровая площадка' },
 };
 
 /** A place's name in the reader's language when OpenStreetMap has one. */

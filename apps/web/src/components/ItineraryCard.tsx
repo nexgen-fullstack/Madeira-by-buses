@@ -74,6 +74,12 @@ export function ItineraryCard({ it, best, tags = [], now, day, onSelect }: Props
               </span>
             );
           })}
+          {it.fewerChanges && !best && (
+            <span className="it-card__tag it-card__tag--good" title={t.t('it.walkChangeHint')}>
+              <Footprints size={12} aria-hidden />{' '}
+              {t.t(it.transfers === 0 ? 'it.walkNoChange' : 'it.walkFewerChanges')}
+            </span>
+          )}
           {it.alternative && (
             <span className="it-card__tag">
               <Repeat size={12} aria-hidden /> {t.t('it.otherBus')}

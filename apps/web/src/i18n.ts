@@ -5,6 +5,7 @@ import { en } from './locales/en.ts';
 import { es } from './locales/es.ts';
 import { fr } from './locales/fr.ts';
 import { it } from './locales/it.ts';
+import { nl } from './locales/nl.ts';
 import { pl } from './locales/pl.ts';
 import { pt } from './locales/pt.ts';
 import { ru } from './locales/ru.ts';
@@ -12,7 +13,7 @@ import { uk, type Dict, type Key } from './locales/uk.ts';
 
 export type { Key } from './locales/uk.ts';
 
-export type Lang = 'uk' | 'en' | 'pt' | 'es' | 'fr' | 'it' | 'de' | 'cs' | 'pl' | 'ru';
+export type Lang = 'uk' | 'en' | 'pt' | 'es' | 'fr' | 'it' | 'de' | 'nl' | 'cs' | 'pl' | 'ru';
 
 /** Languages in the picker, each in its own name. */
 export const LANGS: { code: Lang; label: string; locale: string }[] = [
@@ -23,12 +24,13 @@ export const LANGS: { code: Lang; label: string; locale: string }[] = [
   { code: 'fr', label: 'Français', locale: 'fr-FR' },
   { code: 'it', label: 'Italiano', locale: 'it-IT' },
   { code: 'de', label: 'Deutsch', locale: 'de-DE' },
+  { code: 'nl', label: 'Nederlands', locale: 'nl-NL' },
   { code: 'cs', label: 'Čeština', locale: 'cs-CZ' },
   { code: 'pl', label: 'Polski', locale: 'pl-PL' },
   { code: 'ru', label: 'Русский', locale: 'ru-RU' },
 ];
 
-export const DICTS: Record<Lang, Dict> = { uk, en, pt, es, fr, it, de, cs, pl, ru };
+export const DICTS: Record<Lang, Dict> = { uk, en, pt, es, fr, it, de, nl, cs, pl, ru };
 
 const isLang = (code: string): code is Lang => code in DICTS;
 

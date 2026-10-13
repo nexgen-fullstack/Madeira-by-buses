@@ -54,6 +54,10 @@ export const en: Dict = {
   'it.fastest': 'Fastest',
   'it.cheapest': 'Cheapest',
   'it.lessWalking': 'Less walking',
+  'it.walkNoChange': 'Walk, no change',
+  'it.walkFewerChanges': 'Walk, fewer changes',
+  'it.walkChangeHint':
+    'A longer walk to or from the bus, but no extra change of bus and there about as soon',
   'it.express': 'Express · Via Rápida',
   'it.expressHint': 'Express bus on the Via Rápida: fewer stops, less time on board',
   'vr.title': 'On the Via Rápida',

@@ -1289,3 +1289,104 @@ describe('isBusStation', () => {
     }
   });
 });
+
+describe('a longer walk for fewer changes', () => {
+  /**
+   * The owner's trip (13 October 2026): from Tabua to Funchal at 13:16. The 323 from Tabua
+   * to Ribeira Brava's bus station and a change there to the 200 gets to Funchal at 15:08;
+   * on foot along the sea to the station (2 km) one catches the same 200, no change.
+   */
+  function tabua() {
+    const time = (h: number, m: number) =>
+      `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+    const feed = parseGtfs({
+      'agency.txt': toCsv(
+        ['agency_id', 'agency_name', 'agency_url', 'agency_timezone'],
+        [['T', 'Test', 'https://example.com', 'Atlantic/Madeira']],
+      ),
+      'stops.txt': toCsv(
+        ['stop_id', 'stop_name', 'stop_lat', 'stop_lon', 'zone_id'],
+        [
+          ['T', 'Reta Zimbreiros, Tabua', 32.6779, -17.0781, 'RBR'],
+          ['S', 'Estacao Ribeira Brava', 32.673209, -17.064304, 'RBR'],
+          ['F', 'Praça do Povo', 32.646948, -16.907029, 'FNC'],
+        ],
+      ),
+      'routes.txt': toCsv(
+        ['route_id', 'agency_id', 'route_short_name', 'route_long_name', 'route_type'],
+        [
+          ['323', 'T', '323', 'Funchal - Tabua', 3],
+          ['200', 'T', '200', 'Funchal - Ribeira Brava', 3],
+        ],
+      ),
+      'trips.txt': toCsv(
+        ['route_id', 'service_id', 'trip_id'],
+        [
+          ['323', 'WK', 'a'],
+          ['200', 'WK', 'b'],
+        ],
+      ),
+      'stop_times.txt': toCsv(
+        ['trip_id', 'arrival_time', 'departure_time', 'stop_id', 'stop_sequence'],
+        [
+          ['a', time(14, 19), time(14, 19), 'T', 1],
+          ['a', time(14, 29), time(14, 29), 'S', 2],
+          ['a', time(16, 2), time(16, 2), 'F', 3],
+          ['b', time(14, 35), time(14, 35), 'S', 1],
+          ['b', time(15, 8), time(15, 8), 'F', 2],
+        ],
+      ),
+      'calendar.txt': toCsv(
+        [
+          'service_id',
+          'monday',
+          'tuesday',
+          'wednesday',
+          'thursday',
+          'friday',
+          'saturday',
+          'sunday',
+          'start_date',
+          'end_date',
+        ],
+        [['WK', 1, 1, 1, 1, 1, 0, 0, '20260101', '20271231']],
+      ),
+    });
+    return new Network(
+      buildBundle([{ feed, source: { name: 'test' } }], { demo: true, fares: SIGA_FARES_2026 })
+        .bundle,
+    );
+  }
+  const lines = (net: Network, it: Itinerary) =>
+    it.legs.flatMap((l) => (l.kind === 'ride' ? [net.routes[l.route]!.short] : []));
+
+  it('offers the walk to the bus station and the bus straight on, besides the change', () => {
+    const net = tabua();
+    const results = new Planner(net).plan({
+      from: { lat: 32.6795, lon: -17.0795, name: 'Tabua' },
+      to: { lat: 32.6469, lon: -16.907, name: 'Funchal' },
+      date: WEEKDAY,
+      time: at(13, 16),
+    });
+    const best = results[0]!;
+    expect(lines(net, best)).toEqual(['323', '200']);
+    const walk = results.find((it) => it.fewerChanges)!;
+    expect(walk).toBeDefined();
+    expect(lines(net, walk)).toEqual(['200']);
+    expect(walk.arrive).toBe(best.arrive);
+    expect(walk.fare.giro!).toBeLessThan(best.fare.giro!);
+    expect(walk.legs[0]!.kind === 'walk' && walk.legs[0]!.distance).toBeGreaterThan(1500);
+  });
+
+  it('is not offered to those who would rather walk less', () => {
+    const net = tabua();
+    const results = new Planner(net).plan({
+      from: { lat: 32.6795, lon: -17.0795, name: 'Tabua' },
+      to: { lat: 32.6469, lon: -16.907, name: 'Funchal' },
+      date: WEEKDAY,
+      time: at(13, 16),
+      options: ROUTE_PREFERENCES.lessWalking,
+    });
+    expect(results.some((it) => it.fewerChanges)).toBe(false);
+  });
+});

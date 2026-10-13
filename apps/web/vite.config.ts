@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { contentSecurity } from './security.ts';
 
 /** When the timetable built into the app was generated (the phone app compares downloads with it). */
 function bundledData(): string {
@@ -24,6 +25,7 @@ export default defineConfig({
   build: { chunkSizeWarningLimit: 1100 },
   plugins: [
     react(),
+    contentSecurity(),
     VitePWA({
       // Updates wait for a quiet moment (see src/lib/pwa.ts).
       registerType: 'prompt',

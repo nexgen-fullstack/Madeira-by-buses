@@ -10,6 +10,8 @@ import {
   poiLabel,
   withHouseNumbers,
   withoutClutter,
+  withResortWater,
+  RESORT_SEA,
 } from './mapStyles.ts';
 
 /** A tiny stand-in for the OpenFreeMap Liberty style. */
@@ -79,6 +81,7 @@ describe('map styles', () => {
       'mb-satellite-quick',
       'mb-satellite',
       'mb-satellite-close',
+      'mb-resort-sea',
       'road',
       'building-3d',
       'poi',
@@ -112,6 +115,17 @@ describe('map styles', () => {
     });
     expect(withHouseNumbers(style)).toBe(style);
     expect(ids(overlayVector(style, 'satellite'))).toContain('mb-housenumber');
+  });
+
+  it('lays a turquoise resort sea over the imagery, along the coastline, and on the plain map', () => {
+    const sea = overlayVector(VECTOR, 'satellite').layers.find((l) => l.id === 'mb-resort-sea')!;
+    expect(sea).toMatchObject({ type: 'fill', source: 'openmaptiles', 'source-layer': 'water' });
+    expect(sea.type === 'fill' && sea.paint?.['fill-color']).toBe(RESORT_SEA);
+    // Not over the relief map, which has a sea of its own.
+    expect(ids(overlayVector(VECTOR, 'relief'))).not.toContain('mb-resort-sea');
+    const plain = withResortWater(VECTOR).layers.find((l) => l.id === 'water')!;
+    expect(plain.type === 'fill' && plain.paint?.['fill-color']).toMatch(/^#[0-9a-f]{6}$/);
+    expect(plain.type === 'fill' && plain.paint?.['fill-color']).not.toBe('rgb(158,189,255)');
   });
 
   it('falls back to tile-free styles', () => {

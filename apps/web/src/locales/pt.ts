@@ -54,6 +54,10 @@ export const pt: Dict = {
   'it.fastest': 'Mais rápido',
   'it.cheapest': 'Mais barato',
   'it.lessWalking': 'Menos a pé',
+  'it.walkNoChange': 'A pé, sem transbordo',
+  'it.walkFewerChanges': 'A pé, menos transbordos',
+  'it.walkChangeHint':
+    'Uma caminhada mais longa até ao autocarro (ou dele), mas sem transbordo a mais e lá quase à mesma hora',
   'it.express': 'Expresso · Via Rápida',
   'it.expressHint': 'Autocarro expresso pela Via Rápida: menos paragens, menos tempo a bordo',
   'vr.title': 'Pela Via Rápida',

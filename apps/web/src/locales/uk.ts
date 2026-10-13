@@ -61,6 +61,10 @@ export const uk = {
   'it.fastest': 'Найшвидший',
   'it.cheapest': 'Найдешевший',
   'it.lessWalking': 'Менше пішки',
+  'it.walkNoChange': 'Пішки, без пересадки',
+  'it.walkFewerChanges': 'Пішки, менше пересадок',
+  'it.walkChangeHint':
+    'Довша прогулянка до автобуса (чи від нього), зате без зайвої пересадки і не пізніше',
   'it.express': 'Експрес · Via Rápida',
   'it.expressHint': 'Швидкісний автобус по Via Rápida: менше зупинок, швидше в дорозі',
   'vr.title': 'По Via Rápida',

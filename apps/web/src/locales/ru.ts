@@ -58,6 +58,10 @@ export const ru: Dict = {
   'it.fastest': 'Самый быстрый',
   'it.cheapest': 'Самый дешёвый',
   'it.lessWalking': 'Меньше пешком',
+  'it.walkNoChange': 'Пешком, без пересадки',
+  'it.walkFewerChanges': 'Пешком, меньше пересадок',
+  'it.walkChangeHint':
+    'Прогулка до автобуса (или от него) длиннее, зато без лишней пересадки и не позже',
   'it.express': 'Экспресс · Via Rápida',
   'it.expressHint': 'Скоростной автобус по Via Rápida: меньше остановок, быстрее в пути',
   'vr.title': 'По Via Rápida',
