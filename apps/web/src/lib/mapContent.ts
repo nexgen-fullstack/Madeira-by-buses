@@ -116,6 +116,11 @@ export interface MapContent {
   expressways?: LatLon[][];
   /** Little signs with a word or two: the weather in each part of the island, the webcams. */
   badges?: MapBadge[];
+  /**
+   * A tap anywhere on the map (but a stop): the screen's own (the weather of that spot),
+   * with the name of the place under the finger, when the map has one there.
+   */
+  onMapTap?: (at: LatLon & { name?: string }) => void;
 }
 
 /** A little sign on the map: the sky and warmth of a part of the island, a live webcam. */

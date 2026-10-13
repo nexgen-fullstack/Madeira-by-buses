@@ -1,4 +1,5 @@
 import type { Lang } from '../i18n.ts';
+import { haversine } from '@madeirabus/engine';
 import { load, save } from './storage.ts';
 
 /**
@@ -84,6 +85,15 @@ export interface WeatherHour {
   uv: number;
   /** m */
   visibility: number;
+  feels: number;
+  humidity: number;
+  /** Degrees the wind comes from. */
+  dir: number;
+  /** % of the sky. */
+  cloud: number;
+  /** hPa at sea level. */
+  pressure: number;
+  dew: number;
 }
 
 export interface WeatherDay {
@@ -97,6 +107,12 @@ export interface WeatherDay {
   sunrise: string;
   sunset: string;
   uv: number;
+  /** km/h */
+  wind: number;
+  /** Degrees the wind mostly comes from. */
+  dir: number;
+  /** Hours of sunshine. */
+  sun: number;
 }
 
 export interface Forecast {
@@ -143,6 +159,12 @@ const HOURLY = [
   'wind_gusts_10m',
   'uv_index',
   'visibility',
+  'apparent_temperature',
+  'relative_humidity_2m',
+  'wind_direction_10m',
+  'cloud_cover',
+  'pressure_msl',
+  'dew_point_2m',
 ];
 const DAILY = [
   'weather_code',
@@ -154,6 +176,9 @@ const DAILY = [
   'sunrise',
   'sunset',
   'uv_index_max',
+  'wind_speed_10m_max',
+  'wind_direction_10m_dominant',
+  'sunshine_duration',
 ];
 const CURRENT = [
   'temperature_2m',
@@ -225,6 +250,12 @@ export function readForecast(place: WeatherPlace, a: OpenMeteoAnswer): Forecast 
       gusts: num(h.wind_gusts_10m?.[i]),
       uv: num(h.uv_index?.[i]),
       visibility: num(h.visibility?.[i]),
+      feels: num(h.apparent_temperature?.[i]),
+      humidity: num(h.relative_humidity_2m?.[i]),
+      dir: num(h.wind_direction_10m?.[i]),
+      cloud: num(h.cloud_cover?.[i]),
+      pressure: num(h.pressure_msl?.[i]),
+      dew: num(h.dew_point_2m?.[i]),
     })),
     days: (d.time ?? []).map((date, i) => ({
       date: String(date),
@@ -237,11 +268,14 @@ export function readForecast(place: WeatherPlace, a: OpenMeteoAnswer): Forecast 
       sunrise: String(d.sunrise?.[i] ?? ''),
       sunset: String(d.sunset?.[i] ?? ''),
       uv: num(d.uv_index_max?.[i]),
+      wind: num(d.wind_speed_10m_max?.[i]),
+      dir: num(d.wind_direction_10m_dominant?.[i]),
+      sun: num(d.sunshine_duration?.[i]) / 3600,
     })),
   };
 }
 
-const CACHE = 'madeirabus.weather.v1';
+const CACHE = 'madeirabus.weather.v2';
 let pending: Promise<{ at: number; forecasts: Forecast[] } | undefined> | undefined;
 
 /**
@@ -270,6 +304,60 @@ export function loadWeather(): Promise<{ at: number; forecasts: Forecast[] } | u
 }
 
 /** The sea now and the highest waves of the days ahead, on each coast. */
+/** A spot tapped on the map, as a place the weather is told for: `spot:<lat>,<lon>`. */
+export function spotPlace(lat: number, lon: number, name: string): WeatherPlace {
+  const near = WEATHER_PLACES.reduce((a, b) =>
+    haversine({ lat, lon }, b) < haversine({ lat, lon }, a) ? b : a,
+  );
+  return {
+    id: `spot:${lat.toFixed(4)},${lon.toFixed(4)}`,
+    name,
+    lat: Number(lat.toFixed(4)),
+    lon: Number(lon.toFixed(4)),
+    area: near.area,
+  };
+}
+
+/** A `spot:<lat>,<lon>` place's spot, or none. */
+export function readSpot(id: string): { lat: number; lon: number } | undefined {
+  const m = /^spot:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(id);
+  return m ? { lat: Number(m[1]), lon: Number(m[2]) } : undefined;
+}
+
+const full = new Map<string, { at: number; forecast: Promise<Forecast | undefined> }>();
+
+/**
+ * One place's whole forecast: every hour of the 16 days the models reach (the further, the
+ * rougher), at the height of the ground there (Open-Meteo's own map of heights: on Pico do
+ * Arieiro, the summit's weather). Kept a quarter of an hour.
+ */
+export function loadFullForecast(place: WeatherPlace): Promise<Forecast | undefined> {
+  const kept = full.get(place.id);
+  if (kept && Date.now() - kept.at < FRESH) return kept.forecast;
+  const forecast = (async () => {
+    try {
+      const q = new URLSearchParams({
+        latitude: String(place.lat),
+        longitude: String(place.lon),
+        current: CURRENT.join(','),
+        hourly: HOURLY.join(','),
+        daily: DAILY.join(','),
+        timezone: 'Atlantic/Madeira',
+        forecast_days: '16',
+        wind_speed_unit: 'kmh',
+      });
+      const res = await fetch(`${FORECAST}?${q}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return readForecast(place, (await res.json()) as OpenMeteoAnswer);
+    } catch {
+      full.delete(place.id);
+      return undefined;
+    }
+  })();
+  full.set(place.id, { at: Date.now(), forecast });
+  return forecast;
+}
+
 export async function loadSea(): Promise<Sea[]> {
   const q = new URLSearchParams({
     latitude: SEA_PLACES.map((p) => p.lat).join(','),
@@ -439,6 +527,16 @@ const WORDS = {
   rain: { uk: 'Опади', en: 'Rain', pt: 'Precipitação', es: 'Lluvia', fr: 'Pluie', it: 'Pioggia', de: 'Regen', cs: 'Srážky', pl: 'Opady', ru: 'Осадки' },
   clouds: { uk: 'Хмарність', en: 'Cloud', pt: 'Nebulosidade', es: 'Nubosidad', fr: 'Nébulosité', it: 'Nuvolosità', de: 'Bewölkung', cs: 'Oblačnost', pl: 'Zachmurzenie', ru: 'Облачность' },
   visibility: { uk: 'Видимість', en: 'Visibility', pt: 'Visibilidade', es: 'Visibilidad', fr: 'Visibilité', it: 'Visibilità', de: 'Sicht', cs: 'Viditelnost', pl: 'Widoczność', ru: 'Видимость' },
+  temp: { uk: 'Температура', en: 'Temperature', pt: 'Temperatura', es: 'Temperatura', fr: 'Température', it: 'Temperatura', de: 'Temperatur', cs: 'Teplota', pl: 'Temperatura', ru: 'Температура' },
+  pressure: { uk: 'Тиск', en: 'Pressure', pt: 'Pressão', es: 'Presión', fr: 'Pression', it: 'Pressione', de: 'Luftdruck', cs: 'Tlak', pl: 'Ciśnienie', ru: 'Давление' },
+  dew: { uk: 'Точка роси', en: 'Dew point', pt: 'Ponto de orvalho', es: 'Punto de rocío', fr: 'Point de rosée', it: 'Punto di rugiada', de: 'Taupunkt', cs: 'Rosný bod', pl: 'Punkt rosy', ru: 'Точка росы' },
+  sunshine: { uk: 'Сонця за день', en: 'Sunshine', pt: 'Horas de sol', es: 'Horas de sol', fr: 'Ensoleillement', it: 'Ore di sole', de: 'Sonnenstunden', cs: 'Slunečního svitu', pl: 'Godziny słońca', ru: 'Солнца за день' },
+  hourly: { uk: 'Погодинно', en: 'Hour by hour', pt: 'Hora a hora', es: 'Hora a hora', fr: 'Heure par heure', it: 'Ora per ora', de: 'Stündlich', cs: 'Po hodinách', pl: 'Godzina po godzinie', ru: 'По часам' },
+  daysAll: { uk: 'Прогноз на {n} днів', en: '{n}-day forecast', pt: 'Previsão a {n} dias', es: 'Previsión a {n} días', fr: 'Prévisions à {n} jours', it: 'Previsioni a {n} giorni', de: '{n}-Tage-Vorhersage', cs: 'Předpověď na {n} dní', pl: 'Prognoza na {n} dni', ru: 'Прогноз на {n} дней' },
+  rough: { uk: 'Далі ніж за тиждень прогноз приблизний.', en: 'Beyond a week the forecast is rough.', pt: 'Para lá de uma semana, a previsão é aproximada.', es: 'Más allá de una semana la previsión es aproximada.', fr: 'Au-delà d’une semaine, la prévision est approximative.', it: 'Oltre una settimana la previsione è indicativa.', de: 'Über eine Woche hinaus ist die Vorhersage grob.', cs: 'Po týdnu je předpověď jen přibližná.', pl: 'Po tygodniu prognoza jest przybliżona.', ru: 'Дальше недели прогноз приблизительный.' },
+  spot: { uk: 'Точка на карті', en: 'Spot on the map', pt: 'Ponto no mapa', es: 'Punto en el mapa', fr: 'Point sur la carte', it: 'Punto sulla mappa', de: 'Punkt auf der Karte', cs: 'Bod na mapě', pl: 'Punkt na mapie', ru: 'Точка на карте' },
+  near: { uk: 'біля {place}', en: 'near {place}', pt: 'perto de {place}', es: 'cerca de {place}', fr: 'près de {place}', it: 'vicino a {place}', de: 'bei {place}', cs: 'u {place}', pl: 'koło {place}', ru: 'возле {place}' },
+  tapMap: { uk: 'Торкніться будь-якого місця на карті — покажу погоду саме там, на його висоті.', en: 'Tap anywhere on the map for the weather right there, at its height.', pt: 'Toque em qualquer ponto do mapa para ver o tempo ali, à sua altitude.', es: 'Toque cualquier punto del mapa para ver el tiempo allí, a su altitud.', fr: 'Touchez n’importe où sur la carte pour la météo à cet endroit, à son altitude.', it: 'Tocca un punto qualsiasi della mappa per il meteo lì, alla sua quota.', de: 'Irgendwo auf die Karte tippen: das Wetter genau dort, auf seiner Höhe.', cs: 'Klepněte kamkoli na mapu a uvidíte počasí přesně tam, v jeho výšce.', pl: 'Dotknij dowolnego miejsca na mapie, by zobaczyć pogodę właśnie tam, na jego wysokości.', ru: 'Нажмите в любом месте карты — покажу погоду именно там, на его высоте.' },
   hours: { uk: 'Найближчі години', en: 'Next hours', pt: 'Próximas horas', es: 'Próximas horas', fr: 'Prochaines heures', it: 'Prossime ore', de: 'Nächste Stunden', cs: 'Příští hodiny', pl: 'Najbliższe godziny', ru: 'Ближайшие часы' },
   days: { uk: 'На тиждень', en: 'This week', pt: 'Esta semana', es: 'Esta semana', fr: 'Cette semaine', it: 'Questa settimana', de: 'Diese Woche', cs: 'Tento týden', pl: 'Ten tydzień', ru: 'На неделю' },
   island: { uk: 'Де зараз сонце', en: 'Where the sun is now', pt: 'Onde está o sol agora', es: 'Dónde hace sol ahora', fr: 'Où est le soleil', it: 'Dov’è il sole adesso', de: 'Wo jetzt die Sonne scheint', cs: 'Kde teď svítí slunce', pl: 'Gdzie teraz świeci słońce', ru: 'Где сейчас солнце' },

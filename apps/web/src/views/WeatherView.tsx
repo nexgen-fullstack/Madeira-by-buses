@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   BellRing,
+  Cloud,
   Droplets,
+  Eye,
   Gauge,
+  Sun,
   Sunrise,
   Sunset,
   Thermometer,
@@ -22,13 +25,18 @@ import { navigate, type Route } from '../lib/router.ts';
 import { useWarnings, useWeather } from '../lib/useWeather.ts';
 import {
   compass,
+  loadFullForecast,
+  readSpot,
   skyName,
   skySign,
+  spotPlace,
   sunniest,
   WEATHER_PLACES,
   weatherWord,
   type Forecast,
   type Warning,
+  type WeatherHour,
+  type WeatherPlace,
 } from '../lib/weather.ts';
 
 /**
@@ -53,8 +61,37 @@ export function WeatherView({ route }: { route: Route }) {
     [here],
   );
   const placeId = asked ?? nearest.id;
-  const chosen = forecasts?.find((f) => f.place.id === placeId) ?? forecasts?.[0];
+  // A spot tapped on the map: its own place, named after what is there, or near which town.
+  const spot = readSpot(placeId);
+  const spotName = route.query.get('n');
+  const place = useMemo<WeatherPlace>(() => {
+    if (!spot) return WEATHER_PLACES.find((p) => p.id === placeId) ?? WEATHER_PLACES[0]!;
+    const town = WEATHER_PLACES.reduce((a, b) => (haversine(spot, b) < haversine(spot, a) ? b : a));
+    const name =
+      spotName ??
+      (haversine(spot, town) < 4000
+        ? `${weatherWord('spot', lang)} · ${weatherWord('near', lang, { place: town.name })}`
+        : weatherWord('spot', lang));
+    return spotPlace(spot.lat, spot.lon, name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeId, spotName, lang]);
+  // The place's whole forecast: every hour of every day the models reach.
+  const [full, setFull] = useState<Forecast | undefined>();
+  useEffect(() => {
+    let on = true;
+    setFull(undefined);
+    void loadFullForecast(place).then((f) => on && setFull(f));
+    return () => {
+      on = false;
+    };
+  }, [place]);
+  const chosen =
+    full ??
+    (spot ? undefined : (forecasts?.find((f) => f.place.id === place.id) ?? forecasts?.[0]));
   const choose = (id: string) => navigate('weather', { p: id });
+  // The day whose hours are shown: today until another is tapped.
+  const [dayPicked, setDayPicked] = useState<string | undefined>();
+  useEffect(() => setDayPicked(undefined), [place]);
 
   const content = useMemo<MapContent | undefined>(
     () =>
@@ -63,18 +100,40 @@ export function WeatherView({ route }: { route: Route }) {
         points: [],
         fitKey: 'weather',
         fit: WEATHER_PLACES.filter((p) => p.area !== 'MPS'),
-        badges: forecasts.map((f) => ({
-          id: `weather-${f.place.id}`,
-          kind: 'weather' as const,
-          lat: f.place.lat,
-          lon: f.place.lon,
-          text: `${skySign(f.now.code, f.now.day)} ${Math.round(f.now.temp)}°`,
-          sub: f.place.name,
-          active: f.place.id === chosen?.place.id,
-          onTap: () => choose(f.place.id),
-        })),
+        // Any spot tapped: its weather.
+        onMapTap: (at) =>
+          navigate('weather', {
+            p: `spot:${at.lat.toFixed(4)},${at.lon.toFixed(4)}`,
+            ...(at.name ? { n: at.name } : {}),
+          }),
+        badges: [
+          ...(spot && full
+            ? [
+                {
+                  id: 'weather-spot',
+                  kind: 'weather' as const,
+                  lat: spot.lat,
+                  lon: spot.lon,
+                  text: `${skySign(full.now.code, full.now.day)} ${Math.round(full.now.temp)}°`,
+                  sub: `${full.elevation} m`,
+                  active: true,
+                },
+              ]
+            : []),
+          ...forecasts.map((f) => ({
+            id: `weather-${f.place.id}`,
+            kind: 'weather' as const,
+            lat: f.place.lat,
+            lon: f.place.lon,
+            text: `${skySign(f.now.code, f.now.day)} ${Math.round(f.now.temp)}°`,
+            sub: f.place.name,
+            active: f.place.id === chosen?.place.id,
+            onTap: () => choose(f.place.id),
+          })),
+        ],
       },
-    [forecasts, chosen?.place.id],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [forecasts, chosen?.place.id, spot?.lat, spot?.lon, full],
   );
   useMapContent(content);
 
@@ -82,6 +141,7 @@ export function WeatherView({ route }: { route: Route }) {
   const [notifyOn, setNotifyOn] = useState<boolean | undefined>();
   useEffect(() => void canNotify().then(setNotifyOn), []);
 
+  const nowHour = chosen?.hours.find((h) => h.time.slice(0, 13) === chosen.now.time.slice(0, 13));
   const time = (iso: string) => iso.slice(11, 16);
   const weekday = (iso: string) =>
     new Intl.DateTimeFormat(t.locale, { weekday: 'short', timeZone: 'UTC' }).format(
@@ -128,9 +188,28 @@ export function WeatherView({ route }: { route: Route }) {
                 ? `${chosen.days[0].chance}% · ${chosen.days[0].rain.toFixed(1)} mm`
                 : '—'}
             </Fact>
-            <Fact icon={Gauge} label={weatherWord('uv', lang)}>
-              {chosen.days[0] ? Math.round(chosen.days[0].uv) : '—'}
+            <Fact icon={Cloud} label={weatherWord('clouds', lang)}>
+              {Math.round(chosen.now.cloud)}%
             </Fact>
+            <Fact icon={Sun} label={weatherWord('uv', lang)}>
+              {chosen.days[0] ? Math.round(chosen.days[0].uv) : '—'}
+              {chosen.days[0] && chosen.days[0].sun > 0
+                ? ` · ☀️ ${chosen.days[0].sun.toFixed(1)} h`
+                : ''}
+            </Fact>
+            {nowHour && (
+              <>
+                <Fact icon={Gauge} label={weatherWord('pressure', lang)}>
+                  {Math.round(nowHour.pressure)} hPa
+                </Fact>
+                <Fact icon={Eye} label={weatherWord('visibility', lang)}>
+                  {visibilityText(nowHour.visibility)}
+                </Fact>
+                <Fact icon={Droplets} label={weatherWord('dew', lang)}>
+                  {Math.round(nowHour.dew)}°
+                </Fact>
+              </>
+            )}
             {chosen.days[0] && (
               <Fact icon={Sunrise} label={weatherWord('sunrise', lang)}>
                 {time(chosen.days[0].sunrise)}
@@ -142,26 +221,47 @@ export function WeatherView({ route }: { route: Route }) {
         </section>
       )}
 
-      {chosen && <Hours forecast={chosen} />}
+      {!spot && <p className="muted small">{weatherWord('tapMap', lang)}</p>}
+      {spot && !chosen && <p className="muted">{weatherWord('loading', lang)}</p>}
+
+      {chosen && <Hours forecast={chosen} day={dayPicked} />}
 
       {chosen && (
         <section className="weather-card">
-          <h3>{weatherWord('days', lang)}</h3>
+          <h3>
+            {chosen.days.length > 7
+              ? weatherWord('daysAll', lang, { n: chosen.days.length })
+              : weatherWord('days', lang)}
+          </h3>
           <ol className="weather-days">
-            {chosen.days.map((d) => (
+            {chosen.days.map((d, i) => (
               <li key={d.date}>
-                <span className="weather-days__day">{weekday(d.date)}</span>
-                <span aria-hidden>{skySign(d.code)}</span>
-                <span className="weather-days__sky small muted">{skyName(d.code, lang)}</span>
-                <span className="weather-days__rain small">
-                  {d.chance >= 20 ? `💧 ${d.chance}%` : ''}
-                </span>
-                <span className="weather-days__temp">
-                  <b>{Math.round(d.max)}°</b> <span className="muted">{Math.round(d.min)}°</span>
-                </span>
+                <button
+                  type="button"
+                  className="weather-days__pick"
+                  aria-pressed={(dayPicked ?? chosen.days[0]?.date) === d.date}
+                  disabled={!chosen.hours.some((h) => h.time.startsWith(d.date))}
+                  onClick={() => setDayPicked(i === 0 ? undefined : d.date)}
+                >
+                  <span className="weather-days__day">
+                    {weekday(d.date)} <span className="muted small">{d.date.slice(8, 10)}</span>
+                  </span>
+                  <span aria-hidden>{skySign(d.code)}</span>
+                  <span className="weather-days__sky small muted">{skyName(d.code, lang)}</span>
+                  <span className="weather-days__rain small">
+                    {d.chance >= 20 ? `💧 ${d.chance}%` : ''}
+                  </span>
+                  <span className="weather-days__wind small muted">
+                    💨 {compass(d.dir)} {Math.round(d.wind)}
+                  </span>
+                  <span className="weather-days__temp">
+                    <b>{Math.round(d.max)}°</b> <span className="muted">{Math.round(d.min)}°</span>
+                  </span>
+                </button>
               </li>
             ))}
           </ol>
+          {chosen.days.length > 7 && <p className="muted small">{weatherWord('rough', lang)}</p>}
         </section>
       )}
 
@@ -263,29 +363,152 @@ function Fact({
   );
 }
 
-/** The next day hour by hour: the sky, the warmth, the chance of rain, the gusts. */
-function Hours({ forecast }: { forecast: Forecast }) {
+const visibilityText = (m: number) =>
+  m >= 10_000
+    ? `${Math.round(m / 1000)} km`
+    : m >= 1000
+      ? `${(m / 1000).toFixed(1)} km`
+      : `${Math.round(m)} m`;
+
+/** What the hours can be followed by: each hour a bar, its value over it. */
+const METRICS = {
+  temp: { icon: Thermometer, word: 'temp', of: (h: WeatherHour) => h.temp, unit: '°' },
+  rain: { icon: Umbrella, word: 'rain', of: (h: WeatherHour) => h.chance, unit: '%' },
+  wind: { icon: Wind, word: 'wind', of: (h: WeatherHour) => h.gusts, unit: '' },
+  humidity: { icon: Droplets, word: 'humidity', of: (h: WeatherHour) => h.humidity, unit: '%' },
+  clouds: { icon: Cloud, word: 'clouds', of: (h: WeatherHour) => h.cloud, unit: '%' },
+  uv: { icon: Sun, word: 'uv', of: (h: WeatherHour) => h.uv, unit: '' },
+  visibility: {
+    icon: Eye,
+    word: 'visibility',
+    of: (h: WeatherHour) => h.visibility / 1000,
+    unit: '',
+  },
+  pressure: { icon: Gauge, word: 'pressure', of: (h: WeatherHour) => h.pressure, unit: '' },
+} as const;
+type Metric = keyof typeof METRICS;
+
+/**
+ * A day hour by hour (today: the next 24 hours from now): the sky of each, and one measure
+ * as bars to follow through the day — warmth, rain, gusts, humidity, cloud, UV, visibility,
+ * pressure — with everything about an hour tapped.
+ */
+function Hours({ forecast, day }: { forecast: Forecast; day?: string }) {
   const t = useI18n();
+  const lang = t.lang;
+  const [metric, setMetric] = useState<Metric>('temp');
+  const [hourPicked, setHourPicked] = useState<string | undefined>();
+  useEffect(() => setHourPicked(undefined), [day, forecast]);
   const now = forecast.now.time.slice(0, 13);
-  const next = forecast.hours.filter((h) => h.time.slice(0, 13) >= now).slice(0, 24);
+  const next = day
+    ? forecast.hours.filter((h) => h.time.startsWith(day))
+    : forecast.hours.filter((h) => h.time.slice(0, 13) >= now).slice(0, 24);
+  const m = METRICS[metric];
+  const values = next.map(m.of);
+  const lo = metric === 'temp' || metric === 'pressure' ? Math.min(...values) - 1 : 0;
+  const hi = Math.max(...values, lo + 1);
+  const text = (v: number) =>
+    `${metric === 'visibility' && v < 10 ? v.toFixed(1) : Math.round(v)}${m.unit}`;
+  const picked = next.find((h) => h.time === hourPicked);
   return (
     <section className="weather-card">
-      <h3>{weatherWord('hours', t.lang)}</h3>
+      <h3>
+        {weatherWord('hourly', lang)}
+        {day && (
+          <span className="muted small">
+            {' · '}
+            {new Intl.DateTimeFormat(t.locale, {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              timeZone: 'UTC',
+            }).format(new Date(`${day}T00:00:00Z`))}
+          </span>
+        )}
+      </h3>
+      <div className="chips weather-metrics" role="group">
+        {(Object.keys(METRICS) as Metric[]).map((k) => {
+          const Icon = METRICS[k].icon;
+          return (
+            <button
+              key={k}
+              type="button"
+              className="chip"
+              aria-pressed={metric === k}
+              onClick={() => setMetric(k)}
+            >
+              <Icon size={14} aria-hidden /> {weatherWord(METRICS[k].word, lang)}
+            </button>
+          );
+        })}
+      </div>
       <div className="weather-hours" role="list">
         {next.map((h, i) => (
-          <div key={h.time} className="weather-hour" role="listitem">
+          <button
+            key={h.time}
+            type="button"
+            className="weather-hour"
+            role="listitem"
+            aria-pressed={h.time === hourPicked}
+            onClick={() => setHourPicked(h.time === hourPicked ? undefined : h.time)}
+          >
             <span className="muted small">
-              {i === 0 ? weatherWord('now', t.lang) : h.time.slice(11, 16)}
+              {i === 0 && !day ? weatherWord('now', lang) : h.time.slice(11, 16)}
             </span>
             <span aria-hidden className="weather-hour__sign">
               {skySign(h.code, h.day)}
             </span>
-            <span className="strong">{Math.round(h.temp)}°</span>
-            <span className="weather-hour__rain small">{h.chance >= 10 ? `${h.chance}%` : ''}</span>
-            <span className="muted small">💨 {Math.round(h.gusts)}</span>
-          </div>
+            <span className="strong small">{text(values[i]!)}</span>
+            <span className="weather-hour__bar" aria-hidden>
+              <span style={{ height: `${Math.max(4, ((values[i]! - lo) / (hi - lo)) * 100)}%` }} />
+            </span>
+            <span className="muted small">
+              {metric === 'wind'
+                ? compass(h.dir)
+                : metric === 'temp'
+                  ? ''
+                  : `${Math.round(h.temp)}°`}
+            </span>
+          </button>
         ))}
       </div>
+      <p className="muted small">
+        {metric === 'wind' && `km/h · ${weatherWord('gusts', lang)}`}
+        {metric === 'visibility' && 'km'}
+        {metric === 'pressure' && 'hPa'}
+      </p>
+      {picked && (
+        <div className="weather-now__facts">
+          <Fact
+            icon={Thermometer}
+            label={`${picked.time.slice(11, 16)} · ${weatherWord('feels', lang)}`}
+          >
+            {Math.round(picked.temp)}° · {Math.round(picked.feels)}°
+          </Fact>
+          <Fact icon={Wind} label={weatherWord('wind', lang)}>
+            {compass(picked.dir)} {Math.round(picked.wind)} km/h · {weatherWord('gusts', lang)}{' '}
+            {Math.round(picked.gusts)}
+          </Fact>
+          <Fact icon={Umbrella} label={weatherWord('rain', lang)}>
+            {picked.chance}% · {picked.rain.toFixed(1)} mm
+          </Fact>
+          <Fact icon={Droplets} label={weatherWord('humidity', lang)}>
+            {Math.round(picked.humidity)}% · {weatherWord('dew', lang)} {Math.round(picked.dew)}°
+          </Fact>
+          <Fact icon={Cloud} label={weatherWord('clouds', lang)}>
+            {Math.round(picked.cloud)}% · {skyName(picked.code, lang)}
+          </Fact>
+          <Fact icon={Eye} label={weatherWord('visibility', lang)}>
+            {visibilityText(picked.visibility)}
+          </Fact>
+          <Fact icon={Sun} label={weatherWord('uv', lang)}>
+            {Math.round(picked.uv)}
+          </Fact>
+          <Fact icon={Gauge} label={weatherWord('pressure', lang)}>
+            {Math.round(picked.pressure)} hPa
+          </Fact>
+        </div>
+      )}
     </section>
   );
 }

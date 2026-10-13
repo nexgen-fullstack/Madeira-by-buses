@@ -1797,6 +1797,19 @@ export default function MapView({ className }: { className?: string }) {
         navigate('stop', { ids: String(stop.properties.stops) });
         return;
       }
+      // The screen takes any tap (the weather: that spot's).
+      const onMapTap = contentRef.current.onMapTap;
+      if (onMapTap) {
+        const named = features.find(
+          (f) => (f.sourceLayer === 'poi' || f.sourceLayer === 'place') && f.properties?.name,
+        );
+        onMapTap({
+          lat: e.lngLat.lat,
+          lon: e.lngLat.lng,
+          ...(named ? { name: String(named.properties.name) } : {}),
+        });
+        return;
+      }
       // A line the screen takes taps on: another trail met on a trail's way, added to it.
       const keyed = features.find((f) => f.layer.id.startsWith('mb-line') && f.properties?.key);
       const onLine = contentRef.current.onLine;
