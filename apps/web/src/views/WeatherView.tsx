@@ -17,18 +17,22 @@ import {
 } from 'lucide-react';
 import { haversine } from '@madeirabus/engine';
 import { useMapContent } from '../components/mapContext.tsx';
+import { SkyIcon } from '../components/SkyIcon.tsx';
+import { skySvg } from '../lib/skyIcon.ts';
 import { useI18n } from '../i18n.ts';
 import { askNotify, canNotify } from '../lib/device.ts';
 import { useQuietPosition } from '../lib/geolocation.ts';
 import type { MapContent } from '../lib/mapContent.ts';
+import { placeName } from '../lib/mapStyles.ts';
 import { navigate, type Route } from '../lib/router.ts';
+import { useNetwork } from '../state/app.tsx';
 import { useWarnings, useWeather } from '../lib/useWeather.ts';
 import {
   compass,
   loadFullForecast,
   readSpot,
   skyName,
-  skySign,
+  spotLocality,
   spotPlace,
   sunniest,
   WEATHER_PLACES,
@@ -52,6 +56,7 @@ export function WeatherView({ route }: { route: Route }) {
   const { forecasts, at, sea, failed } = useWeather(true);
   const warnings = useWarnings();
   // The place asked for, else the part of the island nearest the phone, else Funchal.
+  const { net } = useNetwork();
   const asked = route.query.get('p');
   const nearest = useMemo(
     () =>
@@ -66,15 +71,19 @@ export function WeatherView({ route }: { route: Route }) {
   const spotName = route.query.get('n');
   const place = useMemo<WeatherPlace>(() => {
     if (!spot) return WEATHER_PLACES.find((p) => p.id === placeId) ?? WEATHER_PLACES[0]!;
+    // Named after the place it is in: the peak it is on, else the village or the part of a
+    // town around it (Tabua, not Ribeira Brava down the coast); else near which town.
+    const here = spotLocality(net?.bundle.places ?? [], spot);
+    if (here) return spotPlace(spot.lat, spot.lon, placeName(here, lang));
     const town = WEATHER_PLACES.reduce((a, b) => (haversine(spot, b) < haversine(spot, a) ? b : a));
-    // Always the spot itself: "near" what the map has there, or the nearest town.
     const by = spotName ?? (haversine(spot, town) < 4000 ? town.name : undefined);
-    const name = by
-      ? `${weatherWord('spot', lang)} · ${weatherWord('near', lang, { place: by })}`
-      : weatherWord('spot', lang);
-    return spotPlace(spot.lat, spot.lon, name);
+    return spotPlace(
+      spot.lat,
+      spot.lon,
+      by ? weatherWord('near', lang, { place: by }) : weatherWord('spot', lang),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placeId, spotName, lang]);
+  }, [placeId, spotName, lang, net]);
   // The place's whole forecast: every hour of every day the models reach.
   const [full, setFull] = useState<Forecast | undefined>();
   useEffect(() => {
@@ -125,9 +134,8 @@ export function WeatherView({ route }: { route: Route }) {
                   kind: 'weather' as const,
                   lat: spot.lat,
                   lon: spot.lon,
-                  text: full
-                    ? `${skySign(full.now.code, full.now.day)} ${Math.round(full.now.temp)}°`
-                    : '…',
+                  ...(full ? { icon: skySvg(full.now.code, full.now.day, 18) } : {}),
+                  text: full ? `${Math.round(full.now.temp)}°` : '…',
                   sub: full ? `${full.elevation} m` : weatherWord('spot', lang),
                   active: true,
                 },
@@ -141,7 +149,8 @@ export function WeatherView({ route }: { route: Route }) {
               kind: 'weather' as const,
               lat: f.place.lat,
               lon: f.place.lon,
-              text: `${skySign(f.now.code, f.now.day)} ${Math.round(f.now.temp)}°`,
+              icon: skySvg(f.now.code, f.now.day, 18),
+              text: `${Math.round(f.now.temp)}°`,
               sub: f.place.name,
               active: f.place.id === chosen?.place.id,
               onTap: () => choose(f.place.id),
@@ -177,12 +186,18 @@ export function WeatherView({ route }: { route: Route }) {
         <section className="weather-now" aria-live="polite">
           <div className="weather-now__head">
             <span className="weather-now__sign" aria-hidden>
-              {skySign(chosen.now.code, chosen.now.day)}
+              <SkyIcon code={chosen.now.code} day={chosen.now.day} size={64} />
             </span>
             <div>
-              <div className="weather-now__temp">{Math.round(chosen.now.temp)}°</div>
+              <div className="weather-now__temp">
+                {Math.round(chosen.now.temp)}°
+                <span className="weather-now__when">
+                  {weatherWord('now', lang)} · {chosen.now.time.slice(11, 16)}
+                </span>
+              </div>
               <div className="strong">{chosen.place.name}</div>
               <div className="muted small">
+                {spot && <>📍 {weatherWord('spot', lang)} · </>}
                 {skyName(chosen.now.code, lang)} ·{' '}
                 {weatherWord('height', lang, { m: chosen.elevation })}
               </div>
@@ -262,7 +277,7 @@ export function WeatherView({ route }: { route: Route }) {
                   <span className="weather-days__day">
                     {weekday(d.date)} <span className="muted small">{d.date.slice(8, 10)}</span>
                   </span>
-                  <span aria-hidden>{skySign(d.code)}</span>
+                  <SkyIcon code={d.code} />
                   <span className="weather-days__sky small muted">{skyName(d.code, lang)}</span>
                   <span className="weather-days__rain small">
                     {d.chance >= 20 ? `💧 ${d.chance}%` : ''}
@@ -294,7 +309,7 @@ export function WeatherView({ route }: { route: Route }) {
                 aria-pressed={f.place.id === chosen?.place.id}
                 onClick={() => choose(f.place.id)}
               >
-                <span aria-hidden>{skySign(f.now.code, f.now.day)}</span>
+                <SkyIcon code={f.now.code} day={f.now.day} />
                 <span className="weather-place__name">{f.place.name}</span>
                 <span className="strong">{Math.round(f.now.temp)}°</span>
               </button>
@@ -472,7 +487,7 @@ function Hours({ forecast, day }: { forecast: Forecast; day?: string }) {
               {i === 0 && !day ? weatherWord('now', lang) : h.time.slice(11, 16)}
             </span>
             <span aria-hidden className="weather-hour__sign">
-              {skySign(h.code, h.day)}
+              <SkyIcon code={h.code} day={h.day} size={28} />
             </span>
             <span className="strong small">{text(values[i]!)}</span>
             <span className="weather-hour__bar" aria-hidden>

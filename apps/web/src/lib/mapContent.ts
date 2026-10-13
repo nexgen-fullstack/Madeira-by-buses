@@ -129,6 +129,8 @@ export interface MapBadge extends LatLon {
   kind: 'weather' | 'webcam';
   /** What it says, large ("☀️ 23°"). */
   text: string;
+  /** A picture before it (SVG markup of our own: the sky, sun or moon). */
+  icon?: string;
   /** Under it, small ("Funchal"). */
   sub?: string;
   /** Chosen: drawn stronger. */

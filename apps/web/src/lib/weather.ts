@@ -1,5 +1,5 @@
 import type { Lang } from '../i18n.ts';
-import { haversine } from '@madeirabus/engine';
+import { haversine, type LatLon } from '@madeirabus/engine';
 import { load, save } from './storage.ts';
 
 /**
@@ -244,6 +244,20 @@ export function readForecast(place: WeatherPlace, a: OpenMeteoAnswer): Forecast 
   const c = a.current;
   const h = a.hourly ?? {};
   const d = a.daily;
+  // An hour is day when its middle is between sunrise and sunset (sunrise at 8:10: the hour
+  // from 8 is the morning's, with the sun), by the times of its own day.
+  const light = new Map(
+    (d.time ?? []).map((date, i) => [
+      String(date),
+      [String(d.sunrise?.[i] ?? ''), String(d.sunset?.[i] ?? '')] as const,
+    ]),
+  );
+  const isDay = (time: string, fallback: boolean) => {
+    const sun = light.get(time.slice(0, 10));
+    if (!sun?.[0] || !sun[1]) return fallback;
+    const mid = `${time.slice(0, 14)}30`;
+    return mid >= sun[0] && mid < sun[1];
+  };
   return {
     place,
     elevation: Math.round(a.elevation),
@@ -266,7 +280,7 @@ export function readForecast(place: WeatherPlace, a: OpenMeteoAnswer): Forecast 
       chance: num(h.precipitation_probability?.[i]),
       rain: num(h.precipitation?.[i]),
       code: num(h.weather_code?.[i]),
-      day: h.is_day?.[i] === 1,
+      day: isDay(String(time), h.is_day?.[i] === 1),
       wind: num(h.wind_speed_10m?.[i]),
       gusts: num(h.wind_gusts_10m?.[i]),
       uv: num(h.uv_index?.[i]),
@@ -337,6 +351,35 @@ export function spotPlace(lat: number, lon: number, name: string): WeatherPlace 
     lon: Number(lon.toFixed(4)),
     area: near.area,
   };
+}
+
+/**
+ * The named place a spot is in: a peak it is on (300 m), else the village, town or part of
+ * one around it (villages and towns count as nearer: their names cover more ground), within
+ * 1.8 km; none out in the wild.
+ */
+export function spotLocality<P extends LatLon & { name: string; kind?: string }>(
+  places: readonly P[],
+  spot: LatLon,
+): P | undefined {
+  let best: { p: P; d: number } | undefined;
+  for (const p of places) {
+    const weight =
+      p.kind === 'town' || p.kind === 'village'
+        ? 0.7
+        : p.kind === 'locality'
+          ? 1
+          : p.kind === 'peak'
+            ? 1
+            : undefined;
+    if (weight === undefined) continue;
+    const d = haversine(spot, p);
+    if (p.kind === 'peak' ? d > 300 : d * weight > 1800) continue;
+    // On a peak, the peak.
+    const score = p.kind === 'peak' ? d * 0.3 : d * weight;
+    if (!best || score < best.d) best = { p, d: score };
+  }
+  return best?.p;
 }
 
 /** A `spot:<lat>,<lon>` place's spot, or none. */

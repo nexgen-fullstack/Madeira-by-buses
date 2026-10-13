@@ -94,7 +94,8 @@ import {
 } from '../lib/pois.ts';
 import type { LiveBus } from '../lib/liveBus.ts';
 import { useWarnings, useWeather } from '../lib/useWeather.ts';
-import { skySign, worstLevel } from '../lib/weather.ts';
+import { worstLevel } from '../lib/weather.ts';
+import { SkyIcon } from './SkyIcon.tsx';
 
 // MapLibre computes its worker URL at runtime, which bundlers cannot see; point it at the bundled worker.
 setWorkerUrl(maplibreWorkerUrl);
@@ -2308,7 +2309,7 @@ export default function MapView({ className }: { className?: string }) {
         >
           {funchal ? (
             <span className="map-tool__weather" aria-hidden>
-              <span>{skySign(funchal.code, funchal.day)}</span>
+              <SkyIcon code={funchal.code} day={funchal.day} size={20} />
               <span>{Math.round(funchal.temp)}°</span>
             </span>
           ) : (
@@ -2722,7 +2723,9 @@ function useBadgeMarkers(
       el.setAttribute('aria-label', [b.text, b.sub].filter(Boolean).join(', '));
       const text = document.createElement('span');
       text.className = 'map-badge__text';
-      text.textContent = b.text;
+      // Our own SVG (numbers only), then the words.
+      if (b.icon) text.innerHTML = b.icon;
+      text.append(b.text);
       el.append(text);
       if (b.sub) {
         const sub = document.createElement('span');

@@ -76,8 +76,22 @@ const SATELLITE_CLOSE_MAX = 19;
  * Imagery tiles drawn at half their size on a sharp screen (a phone's two or three pixels
  * to a point): tiles of the next zoom, as crisp as the screen, as a maps app sends them.
  */
-export const satelliteTileSize = (pixelRatio = globalThis.devicePixelRatio ?? 1) =>
-  pixelRatio >= 1.5 ? 128 : 256;
+export const satelliteTileSize = (
+  pixelRatio = globalThis.devicePixelRatio ?? 1,
+  slow = slowConnection(),
+) => (pixelRatio >= 1.5 && !slow ? 128 : 256);
+
+/**
+ * A slow mobile connection (EDGE, 3G) or data saving asked for: the imagery in tiles twice
+ * as large, a quarter of the requests, a touch less crisp, so the map comes at once.
+ */
+export function slowConnection(): boolean {
+  const c = (
+    globalThis.navigator as
+      (Navigator & { connection?: { effectiveType?: string; saveData?: boolean } }) | undefined
+  )?.connection;
+  return Boolean(c && (c.saveData || /^(slow-2g|2g|3g)$/.test(c.effectiveType ?? '')));
+}
 
 /** The map zoom from which the first imagery has no closer tiles and the second takes over. */
 export const satelliteSwitch = (tileSize: number) =>
@@ -177,6 +191,15 @@ export const SATELLITE_PAINT = {
   'raster-resampling': 'linear',
 } as const;
 
+export const SATELLITE_CLOSE_PAINT = {
+  'raster-brightness-min': 0,
+  'raster-brightness-max': 1,
+  'raster-contrast': 0.16,
+  'raster-saturation': 0.22,
+  'raster-resampling': 'linear',
+  'raster-fade-duration': 120,
+} as const;
+
 function satelliteLayers(): LayerSpecification[] {
   const handOver = satelliteSwitch(satelliteTileSize());
   return [
@@ -203,7 +226,9 @@ function satelliteLayers(): LayerSpecification[] {
       type: 'raster',
       source: 'mb-satellite-close',
       minzoom: handOver - 0.5,
-      paint: { ...SATELLITE_PAINT },
+      // Close in, the streets and roofs as they are: no lift of the shadows (which washes
+      // them out), a little more contrast and colour.
+      paint: { ...SATELLITE_CLOSE_PAINT },
     },
   ];
 }

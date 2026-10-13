@@ -4157,6 +4157,9 @@ input[type='time'],
   cursor: pointer;
 }
 .map-badge__text {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   padding: 3px 8px;
   border-radius: 999px;
   background: #fff;
@@ -4268,6 +4271,21 @@ input[type='time'],
 .weather-now__sign {
   font-size: 54px;
   line-height: 1;
+}
+.sky-icon {
+  display: inline-flex;
+  line-height: 0;
+}
+.weather-now__when {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  vertical-align: middle;
+  letter-spacing: 0;
 }
 .weather-now__temp {
   font-size: 40px;
