@@ -6,7 +6,9 @@ import { useBack } from '../lib/back.ts';
 import type { MapContent } from '../lib/mapContent.ts';
 import { navigate, type Route } from '../lib/router.ts';
 import {
+  loadNetmadeiraKey,
   loadWebcamLive,
+  netmadeiraStill,
   playerUrl,
   providerName,
   stillUrl,
@@ -27,10 +29,28 @@ export function WebcamsView({ route }: { route: Route }) {
   useEffect(() => {
     let on = true;
     void loadWebcamLive().then((l) => on && setLive(l));
+    void loadNetmadeiraKey().then((k) => on && setKey(k));
     return () => {
       on = false;
     };
   }, []);
+  // In the app, Netmadeira's own pictures of its cameras, a minute old, renewed every minute.
+  const [key, setKey] = useState<string | undefined>();
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!key) return;
+    // The key lasts about a minute: a new one with each new picture.
+    const timer = setInterval(() => {
+      void loadNetmadeiraKey().then((k) => {
+        if (!k) return;
+        setKey(k);
+        setTick(Date.now());
+      });
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, [key]);
+  const picture = (c: Webcam) =>
+    c.provider === 'netmadeira' && key ? netmadeiraStill(c.id, key, tick) : undefined;
   const openId = route.query.get('c');
   const open = WEBCAMS.find((c) => c.id === openId);
   // Live on YouTube: its player here. Netmadeira's cameras without one: their own page here,
@@ -99,6 +119,10 @@ export function WebcamsView({ route }: { route: Route }) {
                 referrerPolicy="strict-origin-when-cross-origin"
               />
             </div>
+          ) : picture(open) ? (
+            <div className="webcam-player__frame">
+              <img src={picture(open)} alt={open.name} />
+            </div>
           ) : (
             <div className="webcam-player__frame webcam-player__frame--page">
               <iframe src={open.page} title={open.name} />
@@ -149,6 +173,8 @@ export function WebcamsView({ route }: { route: Route }) {
                 <span className="webcam-item__still">
                   {now ? (
                     <img src={stillUrl(now.video)} alt="" loading="lazy" />
+                  ) : picture(c) ? (
+                    <img src={picture(c)} alt="" loading="lazy" />
                   ) : (
                     <Video size={22} aria-hidden />
                   )}

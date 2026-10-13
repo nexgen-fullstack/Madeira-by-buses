@@ -1,4 +1,5 @@
 import cams from './webcams.json';
+import { isNative } from './device.ts';
 import { SITE_URL } from './site.ts';
 
 /**
@@ -70,6 +71,39 @@ export const playerUrl = (video: string) =>
 
 /** YouTube's still of a broadcast, renewed every few minutes while it is live. */
 export const stillUrl = (video: string) => `https://i.ytimg.com/vi/${video}/hqdefault_live.jpg`;
+
+let netmadeiraKey: Promise<string | undefined> | undefined;
+let netmadeiraKeyAt = 0;
+
+/**
+ * Netmadeira's pictures of its cameras, a minute old, are signed for about a minute
+ * ("/<time>/<hash>", the same for every camera): the key off one of its pages, read natively
+ * in the app (the website cannot read their pages); none on the website.
+ */
+export function loadNetmadeiraKey(): Promise<string | undefined> {
+  if (netmadeiraKey && Date.now() - netmadeiraKeyAt < 20_000) return netmadeiraKey;
+  netmadeiraKeyAt = Date.now();
+  netmadeiraKey = (async () => {
+    if (!isNative()) return undefined;
+    try {
+      const { CapacitorHttp } = await import('@capacitor/core');
+      const res = await CapacitorHttp.get({
+        url: 'https://www.netmadeira.com/webcams-madeira/monte',
+        responseType: 'text',
+      });
+      const html = typeof res.data === 'string' ? res.data : '';
+      return /webcams-madeira\/load\/netmadeira\/[a-z0-9-]+\/(\d+\/[0-9a-f]+)/.exec(html)?.[1];
+    } catch {
+      netmadeiraKeyAt = 0;
+      return undefined;
+    }
+  })();
+  return netmadeiraKey;
+}
+
+/** Netmadeira's picture of one of its cameras, with the key; `n` makes it a new one. */
+export const netmadeiraStill = (id: string, key: string, n = 0) =>
+  `https://www.netmadeira.com/webcams-madeira/load/netmadeira/${id}/${key}${n ? `?n=${n}` : ''}`;
 
 /** Who runs a camera, as their credit reads. */
 export const providerName = (c: Webcam) =>
