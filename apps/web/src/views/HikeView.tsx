@@ -49,7 +49,7 @@ import {
   walkEnds,
   type TrailBranch,
 } from '../lib/trails.ts';
-import { useNetwork } from '../state/app.tsx';
+import { useApp, useNetwork } from '../state/app.tsx';
 import { TrailBadge, trailKm } from './HikesView.tsx';
 
 /** The regional forestry service, which keeps the PR trails and says when one is closed. */
@@ -186,6 +186,8 @@ function Hike({
   const start = startOf(trail);
   const end = endOf(trail);
   const all = useTrails();
+  // The trails button off: the other trails met stay off the map too, only those added show.
+  const othersOn = useApp().settings.map.trails;
   const branches = useMemo(() => (all ? trailBranches(trail, all) : []), [trail, all]);
   const colors = useMemo(() => branchColors(branches), [branches]);
   // The trails near it, the only others on the map with it: those met, those half an hour
@@ -291,7 +293,7 @@ function Hike({
         return {
           lines: [
             ...branches.flatMap((b, i) =>
-              added.has(keys[i]!)
+              added.has(keys[i]!) || !othersOn
                 ? []
                 : [
                     {
@@ -331,8 +333,9 @@ function Hike({
         lines: [
           // Added to the walk: as wide as the trail, with its arrows; the others pale, not
           // part of the way until a tap adds them.
-          ...branches.map((b, i) => {
+          ...branches.flatMap((b, i) => {
             const on = added.has(keys[i]!);
+            if (!on && !othersOn) return [];
             return {
               coords: b.coords,
               color: colors.get(b.trail.id)!,
@@ -366,7 +369,7 @@ function Hike({
         ...(nearby ? { trailIds: nearby } : {}),
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [trail, net, branches, colors, keys, added, nearby, merged]),
+    }, [trail, net, branches, colors, keys, added, nearby, merged, othersOn]),
   );
   // Each other trail met, once, as listed under the trail: walked the way it turns off.
   const met = [...colors].map(([id, color]) => {
