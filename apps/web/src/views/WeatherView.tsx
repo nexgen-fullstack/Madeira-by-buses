@@ -67,11 +67,11 @@ export function WeatherView({ route }: { route: Route }) {
   const place = useMemo<WeatherPlace>(() => {
     if (!spot) return WEATHER_PLACES.find((p) => p.id === placeId) ?? WEATHER_PLACES[0]!;
     const town = WEATHER_PLACES.reduce((a, b) => (haversine(spot, b) < haversine(spot, a) ? b : a));
-    const name =
-      spotName ??
-      (haversine(spot, town) < 4000
-        ? `${weatherWord('spot', lang)} · ${weatherWord('near', lang, { place: town.name })}`
-        : weatherWord('spot', lang));
+    // Always the spot itself: "near" what the map has there, or the nearest town.
+    const by = spotName ?? (haversine(spot, town) < 4000 ? town.name : undefined);
+    const name = by
+      ? `${weatherWord('spot', lang)} · ${weatherWord('near', lang, { place: by })}`
+      : weatherWord('spot', lang);
     return spotPlace(spot.lat, spot.lon, name);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeId, spotName, lang]);
@@ -97,9 +97,19 @@ export function WeatherView({ route }: { route: Route }) {
     () =>
       forecasts && {
         lines: [],
-        points: [],
-        fitKey: 'weather',
-        fit: WEATHER_PLACES.filter((p) => p.area !== 'MPS'),
+        // The yellow pin on the place chosen; the map goes to a place chosen in the list.
+        points: [{ lat: place.lat, lon: place.lon, kind: 'destination' as const }],
+        ...(asked && !spot
+          ? {
+              fitKey: `weather:${place.id}`,
+              fit: [
+                { lat: place.lat - 0.025, lon: place.lon - 0.03 },
+                { lat: place.lat + 0.025, lon: place.lon + 0.03 },
+              ],
+            }
+          : spot
+            ? {}
+            : { fitKey: 'weather', fit: WEATHER_PLACES.filter((p) => p.area !== 'MPS') }),
         // Any spot tapped: its weather.
         onMapTap: (at) =>
           navigate('weather', {
@@ -107,33 +117,39 @@ export function WeatherView({ route }: { route: Route }) {
             ...(at.name ? { n: at.name } : {}),
           }),
         badges: [
-          ...(spot && full
+          // The spot tapped: its own weather (… while it comes), and its height.
+          ...(spot
             ? [
                 {
                   id: 'weather-spot',
                   kind: 'weather' as const,
                   lat: spot.lat,
                   lon: spot.lon,
-                  text: `${skySign(full.now.code, full.now.day)} ${Math.round(full.now.temp)}°`,
-                  sub: `${full.elevation} m`,
+                  text: full
+                    ? `${skySign(full.now.code, full.now.day)} ${Math.round(full.now.temp)}°`
+                    : '…',
+                  sub: full ? `${full.elevation} m` : weatherWord('spot', lang),
                   active: true,
                 },
               ]
             : []),
-          ...forecasts.map((f) => ({
-            id: `weather-${f.place.id}`,
-            kind: 'weather' as const,
-            lat: f.place.lat,
-            lon: f.place.lon,
-            text: `${skySign(f.now.code, f.now.day)} ${Math.round(f.now.temp)}°`,
-            sub: f.place.name,
-            active: f.place.id === chosen?.place.id,
-            onTap: () => choose(f.place.id),
-          })),
+          // The places near the spot step aside: their weather is not its own.
+          ...forecasts
+            .filter((f) => !spot || haversine(spot, f.place) > 1500)
+            .map((f) => ({
+              id: `weather-${f.place.id}`,
+              kind: 'weather' as const,
+              lat: f.place.lat,
+              lon: f.place.lon,
+              text: `${skySign(f.now.code, f.now.day)} ${Math.round(f.now.temp)}°`,
+              sub: f.place.name,
+              active: f.place.id === chosen?.place.id,
+              onTap: () => choose(f.place.id),
+            })),
         ],
       },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [forecasts, chosen?.place.id, spot?.lat, spot?.lon, full],
+    [forecasts, chosen?.place.id, spot?.lat, spot?.lon, full, place, asked],
   );
   useMapContent(content);
 

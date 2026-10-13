@@ -181,6 +181,15 @@ function satelliteLayers(): LayerSpecification[] {
   const handOver = satelliteSwitch(satelliteTileSize());
   return [
     { id: 'mb-background', type: 'background', paint: { 'background-color': '#1f3445' } },
+    // Under the sharp imagery, the same in tiles four times as large (a sixteenth of the
+    // requests): there at once on a slow phone, so a place newly in view is never a dark
+    // hole while its sharp tiles come.
+    {
+      id: 'mb-satellite-quick',
+      type: 'raster',
+      source: 'mb-satellite-quick',
+      paint: { ...SATELLITE_PAINT, 'raster-fade-duration': 0 },
+    },
     {
       id: 'mb-satellite',
       type: 'raster',
@@ -203,6 +212,13 @@ function baseSources(base: BaseLayer): Record<string, SourceSpecification> {
   if (base === 'satellite') {
     const tileSize = satelliteTileSize();
     return {
+      'mb-satellite-quick': {
+        type: 'raster',
+        tiles: [SATELLITE_TILES],
+        tileSize: 512,
+        maxzoom: SATELLITE_MAX,
+        attribution: SATELLITE_ATTRIBUTION,
+      },
       'mb-satellite': {
         type: 'raster',
         tiles: [SATELLITE_TILES],

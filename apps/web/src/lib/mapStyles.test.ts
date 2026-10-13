@@ -76,6 +76,7 @@ describe('map styles', () => {
     const hybrid = overlayVector(VECTOR, 'satellite');
     expect(ids(hybrid)).toEqual([
       'mb-background',
+      'mb-satellite-quick',
       'mb-satellite',
       'mb-satellite-close',
       'road',

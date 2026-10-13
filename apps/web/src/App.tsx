@@ -179,9 +179,9 @@ function Shell() {
   const head = route.path[0] ?? 'plan';
   const demo = data.status === 'ready' && data.net.bundle.demo;
   const panel = useRef<HTMLElement>(null);
-  // A screen opens at its top; back on one seen before (the list of places after one of
-  // them), where it was left.
-  const screenKey = `${route.path.join('/')}|${route.query.get('i') ?? ''}`;
+  // A screen opens at its top (another place's weather too); back on one seen before (the
+  // list of places after one of them), where it was left.
+  const screenKey = `${route.path.join('/')}|${route.query.get('i') ?? route.query.get('p') ?? ''}`;
   const scrolled = useRef(new Map<string, number>());
   const shownKey = useRef(screenKey);
   useEffect(

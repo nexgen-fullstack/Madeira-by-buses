@@ -1929,6 +1929,13 @@ export default function MapView({ className }: { className?: string }) {
       }
       const p = { lat: e.lngLat.lat, lon: e.lngLat.lng };
       setNote(undefined);
+      // The screen takes any spot (the weather: that spot's), held as tapped.
+      const onMapTap = contentRef.current.onMapTap;
+      if (onMapTap) {
+        setPicked(undefined);
+        onMapTap(p);
+        return;
+      }
       setPicked({ name: pointName(netRef.current, p, tRef.current), ...p });
     });
     map.on('movestart', (e) => {

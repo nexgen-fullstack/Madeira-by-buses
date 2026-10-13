@@ -44,6 +44,26 @@ export const WEATHER_PLACES: readonly WeatherPlace[] = [
   { id: 'curral', name: 'Curral das Freiras', lat: 32.7203, lon: -16.9689, area: 'MRM' },
   { id: 'arieiro', name: 'Pico do Arieiro', lat: 32.7356, lon: -16.9286, area: 'MRM' },
   { id: 'paul-da-serra', name: 'Paul da Serra', lat: 32.7353, lon: -17.0559, area: 'MRM' },
+  { id: 'canical', name: 'Caniçal', lat: 32.7386, lon: -16.7375, area: 'MCS' },
+  { id: 'santa-cruz', name: 'Santa Cruz', lat: 32.6876, lon: -16.7929, area: 'MCS' },
+  { id: 'camacha', name: 'Camacha', lat: 32.678, lon: -16.846, area: 'MCS' },
+  { id: 'monte', name: 'Monte', lat: 32.672, lon: -16.901, area: 'MCS' },
+  { id: 'estreito', name: 'Estreito de Câmara de Lobos', lat: 32.668, lon: -16.981, area: 'MCS' },
+  { id: 'ponta-do-sol', name: 'Ponta do Sol', lat: 32.68, lon: -17.1, area: 'MCS' },
+  { id: 'jardim-do-mar', name: 'Jardim do Mar', lat: 32.739, lon: -17.209, area: 'MCS' },
+  { id: 'prazeres', name: 'Prazeres', lat: 32.76, lon: -17.2, area: 'MCS' },
+  { id: 'ponta-do-pargo', name: 'Ponta do Pargo', lat: 32.81, lon: -17.25, area: 'MCS' },
+  { id: 'santo-da-serra', name: 'Santo da Serra', lat: 32.727, lon: -16.813, area: 'MCS' },
+  { id: 'ribeira-da-janela', name: 'Ribeira da Janela', lat: 32.854, lon: -17.153, area: 'MCN' },
+  { id: 'seixal', name: 'Seixal', lat: 32.824, lon: -17.11, area: 'MCN' },
+  { id: 'boaventura', name: 'Boaventura', lat: 32.815, lon: -16.97, area: 'MCN' },
+  { id: 'sao-jorge', name: 'São Jorge', lat: 32.827, lon: -16.907, area: 'MCN' },
+  { id: 'faial', name: 'Faial', lat: 32.785, lon: -16.859, area: 'MCN' },
+  { id: 'pico-ruivo', name: 'Pico Ruivo', lat: 32.759, lon: -16.942, area: 'MRM' },
+  { id: 'encumeada', name: 'Encumeada', lat: 32.754, lon: -17.02, area: 'MRM' },
+  { id: 'rabacal', name: 'Rabaçal', lat: 32.754, lon: -17.131, area: 'MRM' },
+  { id: 'ribeiro-frio', name: 'Ribeiro Frio', lat: 32.735, lon: -16.886, area: 'MRM' },
+  { id: 'poiso', name: 'Poiso', lat: 32.714, lon: -16.888, area: 'MRM' },
   { id: 'porto-santo', name: 'Porto Santo', lat: 33.0612, lon: -16.3388, area: 'MPS' },
 ];
 
@@ -193,17 +213,18 @@ const CURRENT = [
   'cloud_cover',
 ];
 
-/** The address of the forecast for every part of the island at once. */
+/**
+ * The address of the weather now and the days ahead for every part of the island at once
+ * (light, for a slow phone: the hours come for the place chosen, `loadFullForecast`).
+ */
 export function forecastUrl(places: readonly WeatherPlace[] = WEATHER_PLACES): string {
   const q = new URLSearchParams({
     latitude: places.map((p) => p.lat).join(','),
     longitude: places.map((p) => p.lon).join(','),
     current: CURRENT.join(','),
-    hourly: HOURLY.join(','),
     daily: DAILY.join(','),
     timezone: 'Atlantic/Madeira',
     forecast_days: '7',
-    forecast_hours: '48',
     wind_speed_unit: 'kmh',
   });
   return `${FORECAST}?${q}`;
@@ -212,7 +233,7 @@ export function forecastUrl(places: readonly WeatherPlace[] = WEATHER_PLACES): s
 interface OpenMeteoAnswer {
   elevation: number;
   current: Record<string, number | string>;
-  hourly: Record<string, (number | string | null)[]>;
+  hourly?: Record<string, (number | string | null)[]>;
   daily: Record<string, (number | string | null)[]>;
 }
 
@@ -221,7 +242,7 @@ const num = (v: unknown) => (typeof v === 'number' ? v : 0);
 /** Open-Meteo's answer for one place as the app reads it. */
 export function readForecast(place: WeatherPlace, a: OpenMeteoAnswer): Forecast {
   const c = a.current;
-  const h = a.hourly;
+  const h = a.hourly ?? {};
   const d = a.daily;
   return {
     place,
@@ -275,7 +296,7 @@ export function readForecast(place: WeatherPlace, a: OpenMeteoAnswer): Forecast 
   };
 }
 
-const CACHE = 'madeirabus.weather.v2';
+const CACHE = 'madeirabus.weather.v3';
 let pending: Promise<{ at: number; forecasts: Forecast[] } | undefined> | undefined;
 
 /**
