@@ -1,4 +1,5 @@
 import { haversine, type LatLon } from '@madeirabus/engine';
+import { load, save } from './storage.ts';
 import type { Forecast } from './weather.ts';
 
 /**
@@ -121,16 +122,38 @@ export function withMeasured(f: Forecast, measured: Measured, now = Date.now()):
 }
 
 let kept: { at: number; measured: Promise<Measured> } | undefined;
+const EVERY = 20 * 60_000;
+/** The islands' stations' last measurements, kept on the phone between launches. */
+const STORED = 'madeirabus.observed.v1';
 
-/** IPMA's latest measurements, asked at most every 20 minutes; none when they cannot be had. */
+/**
+ * IPMA's latest measurements, asked at most every 20 minutes (the answer, for the whole
+ * country, is some 90 KB: a few seconds on a slow connection, so not at every launch);
+ * none when they cannot be had.
+ */
 export function loadMeasured(): Promise<Measured> {
-  if (kept && Date.now() - kept.at < 20 * 60_000) return kept.measured;
+  if (kept && Date.now() - kept.at < EVERY) return kept.measured;
+  const stored = load<{ at: number; list: [string, { temp: number; at: number }][] } | undefined>(
+    STORED,
+    undefined,
+  );
+  if (stored && Date.now() - stored.at < EVERY && Array.isArray(stored.list)) {
+    kept = { at: stored.at, measured: Promise.resolve(new Map(stored.list)) };
+    return kept.measured;
+  }
   const measured = fetch(OBSERVATIONS)
     .then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json() as Promise<Answer>;
     })
-    .then(readObservations)
+    .then((answer) => {
+      const all = readObservations(answer);
+      const ours: Measured = new Map(
+        STATIONS.flatMap((s) => (all.has(s.id) ? [[s.id, all.get(s.id)!]] : [])),
+      );
+      save(STORED, { at: Date.now(), list: [...ours] });
+      return ours;
+    })
     .catch((): Measured => {
       kept = undefined;
       return new Map();

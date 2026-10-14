@@ -1,0 +1,17 @@
+[
+  {
+    "id": "madeira",
+    "file": "land/madeira.webp",
+    "bounds": [-17.285, 32.615, -16.64, 32.89]
+  },
+  {
+    "id": "desertas",
+    "file": "land/desertas.webp",
+    "bounds": [-16.575, 32.39, -16.44, 32.6]
+  },
+  {
+    "id": "porto-santo",
+    "file": "land/porto-santo.webp",
+    "bounds": [-16.43, 32.98, -16.265, 33.105]
+  }
+]

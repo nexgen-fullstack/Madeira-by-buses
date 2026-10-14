@@ -5,6 +5,8 @@ import type {
   StyleSpecification,
 } from 'maplibre-gl';
 import type { Lang } from '../i18n.ts';
+import LAND from './land.json';
+import { cachedJson, cachedUrl, fetchFirst, prefetch, tilesOver, tileUrl } from './mapCache.ts';
 
 /**
  * Map styles and layers.
@@ -60,6 +62,8 @@ export function nextTrails(layers: MapLayers): MapLayers {
 }
 
 const VECTOR_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+/** Its tiles' index (as the style names it). */
+const VECTOR_TILES = 'https://tiles.openfreemap.org/planet';
 
 /**
  * Imagery tiles, as sharp as a maps app's: Esri's "Clarity" imagery (cloud-free over the
@@ -115,7 +119,7 @@ const SEA = '#9fdde4';
 export function demSource(): SourceSpecification {
   return {
     type: 'raster-dem',
-    tiles: [TERRAIN_TILES],
+    tiles: [cachedUrl(TERRAIN_TILES)],
     tileSize: 256,
     maxzoom: 14,
     encoding: 'terrarium',
@@ -123,10 +127,45 @@ export function demSource(): SourceSpecification {
   };
 }
 
+/**
+ * The islands drawn from their heights, built into the app (public/land, from
+ * scripts/island-relief.py): under the imagery and the relief, there at once and with no
+ * connection, so the island never vanishes into the sea while those come, or if they cannot.
+ */
+export const LAND_IMAGES = LAND as { id: string; file: string; bounds: number[] }[];
+
+function landSources(): Record<string, SourceSpecification> {
+  return Object.fromEntries(
+    LAND_IMAGES.map(({ id, file, bounds: [w, s, e, n] }) => [
+      `mb-land-${id}`,
+      {
+        type: 'image',
+        url: `${import.meta.env.BASE_URL ?? './'}${file}`,
+        coordinates: [
+          [w!, n!],
+          [e!, n!],
+          [e!, s!],
+          [w!, s!],
+        ],
+      },
+    ]),
+  );
+}
+
+function landLayers(): LayerSpecification[] {
+  return LAND_IMAGES.map(({ id }) => ({
+    id: `mb-land-${id}`,
+    type: 'raster',
+    source: `mb-land-${id}`,
+    paint: { 'raster-fade-duration': 0, 'raster-resampling': 'linear' },
+  }));
+}
+
 /** Elevation-tinted land, sea and hill shading. */
 function reliefLayers(): LayerSpecification[] {
   return [
     { id: 'mb-background', type: 'background', paint: { 'background-color': SEA } },
+    ...landLayers(),
     {
       id: 'mb-relief',
       type: 'color-relief',
@@ -247,7 +286,8 @@ function openSeaFar(source: string): LayerSpecification {
   } as LayerSpecification;
 }
 
-function resortSea(): LayerSpecification {
+/** The sea in its bands, from `from` in (all the way out where the vector tiles' sea is not had). */
+function resortSea(from = BANDS_FROM): LayerSpecification {
   // Smoothly by the band's distance from the shore: no step to see between the bands.
   const fade = (near: string | number, far: string | number): ExpressionSpecification => [
     'interpolate',
@@ -263,7 +303,7 @@ function resortSea(): LayerSpecification {
     id: 'mb-resort-sea',
     type: 'fill',
     source: 'mb-coast',
-    minzoom: BANDS_FROM,
+    minzoom: from,
     paint: {
       'fill-color': fade(SHORE_SEA.color, OPEN_SEA.color),
       'fill-antialias': true,
@@ -292,6 +332,8 @@ function satelliteLayers(): LayerSpecification[] {
   const handOver = satelliteSwitch(satelliteTileSize());
   return [
     { id: 'mb-background', type: 'background', paint: { 'background-color': RESORT_SEA_DEEP } },
+    // The island from its heights, under all: never a sea where the land is.
+    ...landLayers(),
     // Under the sharp imagery, the same in tiles four times as large (a sixteenth of the
     // requests): there at once on a slow phone, so a place newly in view is never a dark
     // hole while its sharp tiles come.
@@ -322,35 +364,43 @@ function satelliteLayers(): LayerSpecification[] {
 }
 
 function baseSources(base: BaseLayer): Record<string, SourceSpecification> {
+  const imagery = cachedUrl(SATELLITE_TILES);
   if (base === 'satellite') {
     const tileSize = satelliteTileSize();
     return {
+      ...landSources(),
       // The sea's bands come once the app has them (lib/sea.ts).
-      'mb-coast': { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+      // Not thinned for drawing (`tolerance`): each band's edge is the next one's, point for
+      // point, and thinned apart they would leave hairlines of the dark imagery between them.
+      'mb-coast': {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+        tolerance: 0,
+      },
       'mb-satellite-quick': {
         type: 'raster',
-        tiles: [SATELLITE_TILES],
+        tiles: [imagery],
         tileSize: 512,
         maxzoom: SATELLITE_MAX,
         attribution: SATELLITE_ATTRIBUTION,
       },
       'mb-satellite': {
         type: 'raster',
-        tiles: [SATELLITE_TILES],
+        tiles: [imagery],
         tileSize,
         maxzoom: SATELLITE_MAX,
         attribution: SATELLITE_ATTRIBUTION,
       },
       'mb-satellite-close': {
         type: 'raster',
-        tiles: [SATELLITE_CLOSE_TILES],
+        tiles: [cachedUrl(SATELLITE_CLOSE_TILES)],
         tileSize,
         maxzoom: SATELLITE_CLOSE_MAX,
         attribution: SATELLITE_ATTRIBUTION,
       },
     };
   }
-  return { 'mb-dem': demSource(), 'mb-dem-shade': demSource() };
+  return { ...landSources(), 'mb-dem': demSource(), 'mb-dem-shade': demSource() };
 }
 
 /** Style used when the vector tiles can't be loaded: still a readable island. */
@@ -358,7 +408,8 @@ export function fallbackStyle(base: BaseLayer): StyleSpecification {
   return {
     version: 8,
     sources: baseSources(base === 'map' ? 'relief' : base),
-    layers: base === 'satellite' ? satelliteLayers() : reliefLayers(),
+    // Over the imagery its sea, all the way out (there is no other here).
+    layers: base === 'satellite' ? [...satelliteLayers(), resortSea(0)] : reliefLayers(),
   };
 }
 
@@ -519,20 +570,88 @@ export function withoutClutter(style: StyleSpecification): StyleSpecification {
   };
 }
 
+/** The vector style's files (its tiles' index, fonts, icons) through the phone's cache. */
+export function throughCache(style: StyleSpecification): StyleSpecification {
+  const sprite = style.sprite;
+  return {
+    ...style,
+    ...(style.glyphs ? { glyphs: cachedUrl(style.glyphs) } : {}),
+    ...(sprite
+      ? {
+          sprite:
+            typeof sprite === 'string'
+              ? cachedUrl(sprite)
+              : sprite.map((s) => ({ ...s, url: cachedUrl(s.url) })),
+        }
+      : {}),
+    sources: Object.fromEntries(
+      Object.entries(style.sources).map(([id, source]) => {
+        const s = { ...source } as SourceSpecification & { url?: string; tiles?: string[] };
+        if (typeof s.url === 'string') s.url = cachedUrl(s.url);
+        if (Array.isArray(s.tiles)) s.tiles = s.tiles.map(cachedUrl);
+        return [id, s as SourceSpecification];
+      }),
+    ),
+  };
+}
+
+/** The vector style as last fetched, kept on the phone: the map opens with it at once. */
+const STYLE_KEY = 'madeirabus.mapstyle.v1';
+/** Kept this long, it is used as it is; older, it is fetched anew (and kept if that fails). */
+const STYLE_FRESH = 12 * 3600 * 1000;
+
+function storedStyle(): { at: number; style: StyleSpecification } | undefined {
+  try {
+    const raw = globalThis.localStorage?.getItem(STYLE_KEY);
+    const stored = raw ? (JSON.parse(raw) as { at: number; style: StyleSpecification }) : undefined;
+    return stored?.style?.layers ? stored : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const prepared = (raw: StyleSpecification) =>
+  throughCache(withResortWater(withoutClutter(withHouseNumbers(raw))));
+
 let vectorStyle: Promise<StyleSpecification> | undefined;
 
 async function fetchVectorStyle(): Promise<StyleSpecification> {
+  const stored = storedStyle();
+  if (stored && Date.now() - stored.at < STYLE_FRESH) return prepared(stored.style);
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 7000);
+  // With a copy at hand the network gets a few seconds; without, as long as it takes (the
+  // island is on screen meanwhile; on EDGE the style alone takes some ten seconds).
+  const timer = stored ? setTimeout(() => ctrl.abort(), 4000) : undefined;
   try {
-    const res = await fetch(VECTOR_STYLE, { signal: ctrl.signal });
+    const res = await fetchFirst(VECTOR_STYLE, { signal: ctrl.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return withResortWater(
-      withoutClutter(withHouseNumbers((await res.json()) as StyleSpecification)),
-    );
+    const raw = (await res.json()) as StyleSpecification;
+    try {
+      localStorage.setItem(STYLE_KEY, JSON.stringify({ at: Date.now(), style: raw }));
+    } catch {
+      // No room: fetched again next time.
+    }
+    return prepared(raw);
+  } catch (err) {
+    if (stored) return prepared(stored.style);
+    throw err;
   } finally {
     clearTimeout(timer);
   }
+}
+
+const forBase = (vector: StyleSpecification, base: BaseLayer) =>
+  base === 'map' ? vector : overlayVector(vector, base);
+
+/**
+ * The style to open the map with, at once: the full one when the phone has kept it (so the
+ * map is drawn once, not first without its names and roads and then again with them),
+ * otherwise the tile-free one until `loadStyle` brings it.
+ */
+export function initialStyle(base: BaseLayer): { style: StyleSpecification; vector: boolean } {
+  const stored = storedStyle();
+  if (!stored) return { style: fallbackStyle(base), vector: false };
+  return { style: forBase(prepared(stored.style), base), vector: true };
 }
 
 /** Resolves the full style for a base layer, falling back to tile-free layers. */
@@ -541,11 +660,53 @@ export async function loadStyle(
 ): Promise<{ style: StyleSpecification; vector: boolean }> {
   try {
     vectorStyle ??= fetchVectorStyle();
-    const vector = await vectorStyle;
-    return { style: base === 'map' ? vector : overlayVector(vector, base), vector: true };
+    return { style: forBase(await vectorStyle, base), vector: true };
   } catch {
     vectorStyle = undefined; // retry next time (e.g. when back online)
     return { style: fallbackStyle(base), vector: false };
+  }
+}
+
+/** When the island's tiles were last brought onto the phone (`prefetchIsland`). */
+const PREFETCH_KEY = 'madeirabus.prefetch.v1';
+const PREFETCH_EVERY = 60 * 24 * 3600 * 1000;
+
+/**
+ * The tiles of the whole island as the map shows it from afar down to its villages (the
+ * imagery to tile zoom 13, the names and roads to 12; some 9 MB, fewer as some are already
+ * kept), for the phone to have them: the map then opens and zooms in at once, and works
+ * with no connection. Once (and again every two months), in the background, never on a
+ * slow connection or with data saving asked for.
+ */
+export async function prefetchIsland(busy: () => boolean, stop: () => boolean): Promise<void> {
+  try {
+    const last = Number(localStorage.getItem(PREFETCH_KEY)) || 0;
+    if (Date.now() - last < PREFETCH_EVERY || slowConnection() || !navigator.onLine) return;
+  } catch {
+    return;
+  }
+  const boxes = LAND_IMAGES.map((l) => l.bounds as [number, number, number, number]);
+  const urls: string[] = [];
+  try {
+    const index = storedStyle()?.style.sources.openmaptiles as { url?: string } | undefined;
+    const tilejson = await cachedJson<{ tiles?: string[] }>(index?.url ?? VECTOR_TILES);
+    const template = tilejson.tiles?.[0];
+    if (template)
+      for (let z = 5; z <= 12; z++)
+        for (const box of boxes)
+          for (const [x, y] of tilesOver(box, z)) urls.push(tileUrl(template, z, x, y));
+  } catch {
+    // The names and roads another time; the imagery now.
+  }
+  for (let z = 8; z <= 13; z++)
+    for (const box of boxes)
+      for (const [x, y] of tilesOver(box, z)) urls.push(tileUrl(SATELLITE_TILES, z, x, y));
+  if (await prefetch(urls, busy, stop)) {
+    try {
+      localStorage.setItem(PREFETCH_KEY, String(Date.now()));
+    } catch {
+      // Again next time.
+    }
   }
 }
 

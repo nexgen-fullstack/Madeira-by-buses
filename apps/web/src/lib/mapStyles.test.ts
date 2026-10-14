@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { StyleSpecification } from 'maplibre-gl';
 import {
   buildingLayers,
   DEFAULT_LAYERS,
   fallbackStyle,
+  LAND_IMAGES,
   nextTrails,
   overlayVector,
   placeLayerIds,
@@ -12,6 +13,7 @@ import {
   withoutClutter,
   withResortWater,
   RESORT_SEA,
+  throughCache,
 } from './mapStyles.ts';
 
 /** A tiny stand-in for the OpenFreeMap Liberty style. */
@@ -78,6 +80,9 @@ describe('map styles', () => {
     const hybrid = overlayVector(VECTOR, 'satellite');
     expect(ids(hybrid)).toEqual([
       'mb-background',
+      'mb-land-madeira',
+      'mb-land-desertas',
+      'mb-land-porto-santo',
       'mb-satellite-quick',
       'mb-satellite',
       'mb-satellite-close',
@@ -96,8 +101,11 @@ describe('map styles', () => {
 
   it('puts the same details over the relief map and keeps building footprints', () => {
     const relief = overlayVector(VECTOR, 'relief');
-    expect(ids(relief).slice(0, 5)).toEqual([
+    expect(ids(relief).slice(0, 8)).toEqual([
       'mb-background',
+      'mb-land-madeira',
+      'mb-land-desertas',
+      'mb-land-porto-santo',
       'mb-relief',
       'mb-hillshade',
       'mb-sea',
@@ -133,6 +141,74 @@ describe('map styles', () => {
   it('falls back to tile-free styles', () => {
     expect(ids(fallbackStyle('map'))).toContain('mb-relief');
     expect(ids(fallbackStyle('satellite'))).toContain('mb-satellite');
+    // Its sea in the bands all the way out: there is no other sea there.
+    const sea = fallbackStyle('satellite').layers.find((l) => l.id === 'mb-resort-sea');
+    expect(sea).toMatchObject({ type: 'fill', source: 'mb-coast', minzoom: 0 });
+  });
+
+  it('lays the islands drawn from their heights under the imagery, built into the app', () => {
+    for (const style of [
+      overlayVector(VECTOR, 'satellite'),
+      overlayVector(VECTOR, 'relief'),
+      fallbackStyle('satellite'),
+      fallbackStyle('map'),
+    ]) {
+      const first = ids(style).findIndex((id) => id.startsWith('mb-land-'));
+      // Right over the background, under all else.
+      expect(first).toBe(1);
+      for (const { id, file, bounds } of LAND_IMAGES) {
+        const [w, s, e, n] = bounds;
+        expect(style.sources[`mb-land-${id}`]).toEqual({
+          type: 'image',
+          url: expect.stringMatching(new RegExp(`${file}$`)),
+          coordinates: [
+            [w, n],
+            [e, n],
+            [e, s],
+            [w, s],
+          ],
+        });
+      }
+    }
+    // Madeira, the Desertas and Porto Santo, each where it is.
+    const at = (lon: number, lat: number) =>
+      LAND_IMAGES.find(({ bounds: [w, s, e, n] }) => lon > w! && lon < e! && lat > s! && lat < n!)
+        ?.id;
+    expect(at(-16.91, 32.65)).toBe('madeira'); // Funchal
+    expect(at(-17.25, 32.81)).toBe('madeira'); // Ponta do Pargo
+    expect(at(-16.71, 32.74)).toBe('madeira'); // Ponta de São Lourenço
+    expect(at(-16.5, 32.52)).toBe('desertas'); // Deserta Grande
+    expect(at(-16.34, 33.06)).toBe('porto-santo');
+  });
+
+  it("asks for the map's files through the phone's cache where it has one", () => {
+    const style = {
+      ...VECTOR,
+      sprite: 'https://tiles.openfreemap.org/sprites/ofm',
+      glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+      sources: {
+        openmaptiles: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' },
+        other: { type: 'raster', tiles: ['https://example.com/{z}/{x}/{y}.png'] },
+      },
+    } as StyleSpecification;
+    // No Cache Storage (here, as on a website over plain http): the addresses as they are.
+    expect(throughCache(style)).toEqual(style);
+    vi.stubGlobal('caches', {});
+    try {
+      const cached = throughCache(style);
+      expect(cached.glyphs).toBe('mbc://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf');
+      expect(cached.sprite).toBe('mbc://tiles.openfreemap.org/sprites/ofm');
+      expect(cached.sources.openmaptiles).toEqual({
+        type: 'vector',
+        url: 'mbc://tiles.openfreemap.org/planet',
+      });
+      // Only the map's own servers.
+      expect(cached.sources.other).toEqual(style.sources.other);
+      const imagery = fallbackStyle('satellite').sources['mb-satellite'] as { tiles: string[] };
+      expect(imagery.tiles[0]).toMatch(/^mbc:\/\/clarity\.maptiles\.arcgis\.com\//);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('finds place and building layers', () => {

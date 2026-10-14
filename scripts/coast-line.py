@@ -7,7 +7,8 @@ them into the islands' land, and cuts the sea into bands by how far they are fro
 0-8 m, 8-16 m … 256-290 m, and the open sea beyond. Each band carries its distance
 (`d`, m); the map paints them from a muted turquoise by the shore to the deep teal of the
 ocean, in steps small enough to read as one smooth fade, opaque enough that the seams of
-the satellite imagery under the sea do not show. Writes apps/web/public/coast.json, packed small (see `packed`; the app's
+the satellite imagery under the sea do not show. Every band is cut in squares, without
+holes (see `whole`). Writes apps/web/public/coast.json, packed small (see `packed`; the app's
 lib/sea.ts unpacks it).
 
 Needs Python 3 with Shapely (pip install shapely).
@@ -58,20 +59,47 @@ print(f'{len(lines)} coastline ways -> {len(rings)} pieces of land')
 
 from shapely.geometry.polygon import orient
 
-bands = []  # [distance, polygons]: each polygon its rings, the outer one first
+bands = []  # [distance, polygons]: each polygon its outer ring alone (see `whole`)
+# The bands are cut in squares this wide (degrees), each a piece of its own.
+CELL = 0.1
+
+
+def whole(p):
+    """A polygon as pieces without holes, cut through each hole in turn. The map draws a
+    shape tile by tile: in a tile wholly inside a hole (the island, inside the ring of
+    shallows round it) the ring and its hole are cut to the same square, which the map then
+    fills, covering the land with sea. Without holes there is nothing to lose."""
+    if not p.interiors:
+        return [p]
+    x = Polygon(p.interiors[0]).representative_point().x
+    _, y0, _, y1 = p.bounds
+    out = []
+    for part in ops.split(p, LineString([(x, y0 - 1), (x, y1 + 1)])).geoms:
+        if isinstance(part, Polygon):
+            out += whole(part)
+    return out
 
 
 def polygons(geom):
-    """The polygons of a shape in degrees, each wound as GeoJSON wants it (outer ring
-    anticlockwise, holes clockwise): the map tells the sea from its holes by the winding."""
+    """A shape in metres as polygons in degrees, in squares CELL wide, without holes, each
+    wound as GeoJSON wants it (anticlockwise)."""
     geom = affine_transform(geom, to_deg)
-    parts = geom.geoms if hasattr(geom, 'geoms') else [geom]
+    x0, y0, x1, y1 = geom.bounds
     out = []
-    for p in parts:
-        if not isinstance(p, Polygon) or p.is_empty or p.area < 1e-12:
-            continue
-        p = orient(p, 1.0)
-        out.append([list(p.exterior.coords)] + [list(r.coords) for r in p.interiors])
+    i = math.floor(x0 / CELL)
+    while i * CELL < x1:
+        j = math.floor(y0 / CELL)
+        while j * CELL < y1:
+            cell = box(i * CELL, j * CELL, (i + 1) * CELL, (j + 1) * CELL)
+            piece = geom.intersection(cell) if geom.intersects(cell) else None
+            for p in getattr(piece, 'geoms', [piece]) if piece is not None else []:
+                if not isinstance(p, Polygon) or p.is_empty or p.area < 1e-12:
+                    continue
+                for q in whole(p):
+                    if q.area >= 1e-12:
+                        out.append([list(orient(q, 1.0).exterior.coords)])
+            j += 1
+        i += 1
     return out
 
 
@@ -82,22 +110,8 @@ edges = [land.simplify(SIMPLIFY)] + [
 ]
 for i, d in enumerate(BANDS):
     bands.append([d, polygons(edges[i + 1].difference(edges[i]))])
-# The open sea in squares a tenth of a degree wide: one polygon the size of the map, with the
-# islands as holes, loses them in some of the map's tiles when it is cut up for drawing.
-coast = affine_transform(edges[-1], to_deg)
-open_sea = []
-x0, y0, x1, y1 = SEA.bounds
-step = 0.1
-x = x0
-while x < x1 - 1e-9:
-    y = y0
-    while y < y1 - 1e-9:
-        cell = box(x, y, min(x + step, x1), min(y + step, y1))
-        sea = cell.difference(coast) if cell.intersects(coast) else cell
-        open_sea += polygons(affine_transform(sea, to_m))
-        y += step
-    x += step
-bands.append([9999, open_sea])
+# The open sea out to the map's bounds, in the same squares.
+bands.append([9999, polygons(affine_transform(SEA, to_m).difference(edges[-1]))])
 
 
 def packed(ring):
@@ -111,9 +125,21 @@ def packed(ring):
     return out
 
 
+def solid(poly):
+    """Still a shape once its points are rounded to the metre (a sliver flattens to a line)."""
+    ring = [(round(x * 1e5), round(y * 1e5)) for x, y in poly[0]]
+    twice = sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(ring, ring[1:] + ring[:1]))
+    return twice > 0
+
+
 OUT.write_text(
     json.dumps(
-        {'bands': [[d, [[packed(r) for r in poly] for poly in polys]] for d, polys in bands]},
+        {
+            'bands': [
+                [d, [[packed(r) for r in poly] for poly in polys if solid(poly)]]
+                for d, polys in bands
+            ]
+        },
         separators=(',', ':'),
     ),
     encoding='utf8',

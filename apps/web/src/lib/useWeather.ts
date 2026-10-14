@@ -17,18 +17,30 @@ const WARNINGS_EVERY = 30 * 60_000;
 
 let warningsAt = 0;
 let warningsKept: Warning[] | undefined;
+let warningsComing: Promise<Warning[] | undefined> | undefined;
 const listeners = new Set<(w: Warning[] | undefined) => void>();
 
-/** IPMA's warnings for Madeira, shared by every screen, looked at again every half hour. */
-async function refreshWarnings(force = false): Promise<Warning[] | undefined> {
-  if (!force && warningsKept && Date.now() - warningsAt < WARNINGS_EVERY) return warningsKept;
-  const fresh = await loadWarnings();
-  if (fresh) {
-    warningsKept = fresh;
-    warningsAt = Date.now();
-    for (const l of listeners) l(fresh);
+/**
+ * IPMA's warnings for Madeira, shared by every screen, looked at again every half hour: once
+ * for all the screens that ask at the same moment (at launch, several do).
+ */
+function refreshWarnings(force = false): Promise<Warning[] | undefined> {
+  if (!force && warningsKept && Date.now() - warningsAt < WARNINGS_EVERY) {
+    return Promise.resolve(warningsKept);
   }
-  return warningsKept;
+  warningsComing ??= loadWarnings()
+    .then((fresh) => {
+      if (fresh) {
+        warningsKept = fresh;
+        warningsAt = Date.now();
+        for (const l of listeners) l(fresh);
+      }
+      return warningsKept;
+    })
+    .finally(() => {
+      warningsComing = undefined;
+    });
+  return warningsComing;
 }
 
 /** The official warnings for Madeira (undefined until known), kept fresh while the app is open. */

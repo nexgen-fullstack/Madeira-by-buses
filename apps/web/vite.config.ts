@@ -70,26 +70,8 @@ export default defineConfig({
               expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 180 },
             },
           },
-          {
-            // Open elevation tiles for the relief layer: also available offline once seen.
-            urlPattern: /^https:\/\/s3\.amazonaws\.com\/elevation-tiles-prod\//,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'terrain',
-              expiration: { maxEntries: 3000, maxAgeSeconds: 60 * 60 * 24 * 90 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
-            // Basemap tiles, styles and fonts: cache what the user has seen for offline use.
-            urlPattern: /^https:\/\/tiles\.openfreemap\.org\//,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'basemap',
-              expiration: { maxEntries: 4000, maxAgeSeconds: 60 * 60 * 24 * 30 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
+          // The map's tiles, its fonts and the heights are kept by the page itself, on the
+          // website as in the phone app (src/lib/mapCache.ts), not here as well.
         ],
       },
     }),

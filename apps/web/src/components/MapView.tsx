@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import {
+  addProtocol,
   GeolocateControl,
   LngLatBounds,
   Map as MapLibreMap,
@@ -34,10 +35,12 @@ import { luminance, readableOn } from '../lib/color.ts';
 import { decodePlace, encodePlace } from '../lib/itinerary.ts';
 import { rememberPosition } from '../lib/geolocation.ts';
 import { loadSea } from '../lib/sea.ts';
+import { dropOldCaches, loadCached, PROTOCOL, trim } from '../lib/mapCache.ts';
 import { Snapper } from '../lib/snap.ts';
 import { placePhoto, type PlacePhoto } from '../lib/placePhoto.ts';
 import { hideLaunch } from '../lib/launch.ts';
 import {
+  ISLAND,
   RUN_WIDTH,
   TRAIL_RED,
   transitGeoJson,
@@ -56,11 +59,12 @@ import {
   buildingLayers,
   demSource,
   extrusionLayer,
-  fallbackStyle,
+  initialStyle,
   loadStyle,
   nextTrails,
   placeLayerIds,
   poiLabel,
+  prefetchIsland,
   type BaseLayer,
   type MapLayers,
 } from '../lib/mapStyles.ts';
@@ -100,8 +104,9 @@ import { PlaceCard, type CardPlace } from './PlaceCard.tsx';
 
 // MapLibre computes its worker URL at runtime, which bundlers cannot see; point it at the bundled worker.
 setWorkerUrl(maplibreWorkerUrl);
-
-const MADEIRA_CENTER: [number, number] = [-16.96, 32.75];
+// The map's files through the phone's cache (lib/mapCache.ts).
+addProtocol(PROTOCOL, loadCached as Parameters<typeof addProtocol>[1]);
+dropOldCaches();
 
 interface PickedPlace {
   name: string;
@@ -1704,14 +1709,21 @@ export default function MapView({ className }: { className?: string }) {
   const [moving, setMoving] = useState(false);
   const pickedStop = useRef<PickedStop | undefined>(undefined);
 
-  // Create the map once; start with the tile-free style so the island shows at once.
+  // Create the map once: with the full style when the phone has kept it (drawn once, not
+  // first without its names and roads), otherwise the tile-free one until it comes.
   useEffect(() => {
     if (!container.current) return;
+    const first = initialStyle(layersRef.current.base);
+    shownStyle.current = `${layersRef.current.base}:${first.vector ? 'vector' : 'fallback'}`;
     const map = new MapLibreMap({
       container: container.current,
-      style: fallbackStyle(layersRef.current.base),
-      center: MADEIRA_CENTER,
-      zoom: 9.2,
+      style: first.style,
+      // The whole island from the first frame, as the screen will fit it: no jump at launch.
+      bounds: [
+        [ISLAND[0]!.lon, ISLAND[0]!.lat],
+        [ISLAND[1]!.lon, ISLAND[1]!.lat],
+      ],
+      fitBoundsOptions: { padding: fitPadding(container.current, true) },
       maxPitch: 70,
       maxBounds: [
         [-18.2, 32.0],
@@ -2013,7 +2025,24 @@ export default function MapView({ className }: { className?: string }) {
     // a moment later, so it opens large in the middle of the screen.
     map.once('idle', onInset);
     const settled = window.setTimeout(onInset, 1500);
+    // Once the map has drawn: the oldest kept files make room, and the island's tiles come
+    // onto the phone in the background (once in a while, see `prefetchIsland`).
+    let removed = false;
+    let prefetching: number | undefined;
+    map.once('idle', () => {
+      void trim();
+      prefetching = window.setTimeout(
+        () =>
+          void prefetchIsland(
+            () => map.isMoving() || !map.areTilesLoaded(),
+            () => removed,
+          ),
+        4000,
+      );
+    });
     return () => {
+      removed = true;
+      window.clearTimeout(prefetching);
       window.removeEventListener('mb-map-inset', onInset);
       window.removeEventListener('mb-map-inset', covered);
       window.clearTimeout(settled);
@@ -2024,21 +2053,32 @@ export default function MapView({ className }: { className?: string }) {
     };
   }, []);
 
-  // Base layer: fetch the vector style (if reachable) and swap it in.
+  // Base layer: fetch the vector style (if reachable) and swap it in; not had (offline), tried
+  // again when the phone is back online, and every half minute meanwhile.
   useEffect(() => {
     let cancelled = false;
-    loadStyle(layers.base).then(({ style, vector }) => {
-      const map = mapRef.current;
-      if (cancelled || !map) return;
-      // The tile-free fallback for this base may already be on screen.
-      const key = `${layers.base}:${vector ? 'vector' : 'fallback'}`;
-      if (key === shownStyle.current) return;
-      shownStyle.current = key;
-      styleLoaded.current = false;
-      map.setStyle(style as StyleSpecification, { diff: false });
-    });
+    let retry: number | undefined;
+    const load = () => {
+      window.clearTimeout(retry);
+      void loadStyle(layers.base).then(({ style, vector }) => {
+        const map = mapRef.current;
+        if (cancelled || !map) return;
+        if (!vector) retry = window.setTimeout(load, 30_000);
+        // The tile-free fallback for this base may already be on screen.
+        const key = `${layers.base}:${vector ? 'vector' : 'fallback'}`;
+        if (key === shownStyle.current) return;
+        shownStyle.current = key;
+        styleLoaded.current = false;
+        map.setStyle(style as StyleSpecification, { diff: false });
+      });
+    };
+    load();
+    const online = () => shownStyle.current.endsWith(':fallback') && load();
+    window.addEventListener('online', online);
     return () => {
       cancelled = true;
+      window.clearTimeout(retry);
+      window.removeEventListener('online', online);
     };
   }, [layers.base]);
 
@@ -2841,28 +2881,33 @@ interface Fit {
   moved?: boolean;
 }
 
-function fitTo(map: MapLibreMap, bounds: LngLatBounds, duration: number, island = false) {
-  // Clear of the buttons down the right side, of the pin's height at the top and, on a
-  // phone, of the sheet over the map's bottom.
-  const sheet = parseFloat(
-    getComputedStyle(map.getContainer()).getPropertyValue('--map-bottom-inset'),
-  );
-  const room = map.getContainer().clientHeight;
+/**
+ * The margins of a fit: clear of the buttons down the right side, of the pin's height at
+ * the top and, on a phone, of the sheet over the map's bottom.
+ */
+function fitPadding(container: HTMLElement, island: boolean) {
+  const css = getComputedStyle(container);
+  const sheet = parseFloat(css.getPropertyValue('--map-bottom-inset'));
+  const room = container.clientHeight;
   // A phone on its side has little height: smaller margins, for a larger island. At the
   // top, clear of the buttons there and of the pin and flags standing up from the stops.
   const low = room < 420;
   // Below the turn-by-turn banner over the map's top, while walking.
-  const guide = parseFloat(getComputedStyle(map.getContainer()).getPropertyValue('--guide-h'));
+  const guide = parseFloat(css.getPropertyValue('--guide-h'));
   const top = (low ? 56 : 92) + (Number.isFinite(guide) ? guide : 0);
   const bottom = (low ? 16 : 40) + (Number.isFinite(sheet) ? sheet : 0);
+  return {
+    top,
+    bottom: Math.min(bottom, Math.max(40, room - top - 80)),
+    // The whole island as large as it fits, a little clear of the edges.
+    left: island ? 14 : 40,
+    right: island ? 14 : 64,
+  };
+}
+
+function fitTo(map: MapLibreMap, bounds: LngLatBounds, duration: number, island = false) {
   map.fitBounds(bounds, {
-    padding: {
-      top,
-      bottom: Math.min(bottom, Math.max(40, room - top - 80)),
-      // The whole island as large as it fits, a little clear of the edges.
-      left: island ? 14 : 40,
-      right: island ? 14 : 64,
-    },
+    padding: fitPadding(map.getContainer(), island),
     maxZoom: 15.5,
     duration,
   });

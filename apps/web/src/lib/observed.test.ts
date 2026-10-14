@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { measuredAt, readObservations, withMeasured } from './observed.ts';
 import type { Forecast } from './weather.ts';
 
@@ -51,5 +51,35 @@ describe('the temperature now from IPMA’s stations', () => {
     expect(f.hours[0]!.temp).toBeCloseTo(20.4, 1);
     expect(f.hours[3]!.temp).toBeGreaterThan(20.4);
     expect(f.hours[5]!.temp).toBe(23);
+  });
+
+  it('asks IPMA once in 20 minutes, also across launches, keeping only the islands’ stations', async () => {
+    const stored = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => stored.get(k) ?? null,
+      setItem: (k: string, v: string) => void stored.set(k, v),
+      removeItem: (k: string) => void stored.delete(k),
+    });
+    const fetch = vi.fn(async () =>
+      Response.json({
+        ...answer,
+        '2026-10-14T06:00': { ...answer['2026-10-14T06:00'], '1210881': { temperatura: 15 } },
+      }),
+    );
+    vi.stubGlobal('fetch', fetch);
+    try {
+      vi.resetModules();
+      const first = await (await import('./observed.ts')).loadMeasured();
+      expect(first.get('1200522')?.temp).toBe(20.4);
+      // A station of the mainland: not kept.
+      expect(first.has('1210881')).toBe(false);
+      // The app opened again: from the phone, not the network.
+      vi.resetModules();
+      const again = await (await import('./observed.ts')).loadMeasured();
+      expect(again.get('1200522')?.temp).toBe(20.4);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
