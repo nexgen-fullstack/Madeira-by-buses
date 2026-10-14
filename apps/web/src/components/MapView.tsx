@@ -7,6 +7,7 @@ import {
   ChevronRight,
   CloudSun,
   LayoutGrid,
+  LocateFixed,
   MapPin,
   Signpost,
   Video,
@@ -79,6 +80,7 @@ import { LayerSwitcher } from './LayerSwitcher.tsx';
 import { LineCard, LineChooser, type LinePick } from './LineCard.tsx';
 import { MapContentContext, type PickField, type Spotlight } from './mapContext.tsx';
 import { busImage, busImageId } from './busImage.ts';
+import { MeMarker } from './meMarker.ts';
 import {
   bigStoreImage,
   bigStoreImageId,
@@ -1743,9 +1745,8 @@ export default function MapView({ className }: { className?: string }) {
       showUserLocation: false,
       showAccuracyCircle: false,
     });
-    const me = document.createElement('div');
-    me.className = 'maplibregl-user-location-dot';
-    const meMarker = new Marker({ element: me });
+    // Ours: a dot with a beam the way the phone points, as in Google Maps.
+    const meMarker = new MeMarker();
     let snapper: Snapper | undefined;
     let shownFix = 0;
     // Where the phone was found: a trail then starts at its nearer end.
@@ -1763,8 +1764,7 @@ export default function MapView({ className }: { className?: string }) {
       void (snapper ? snapper.place({ ...fix, speed: p.coords.speed }) : Promise.resolve(fix)).then(
         (at) => {
           if (id !== shownFix) return;
-          meMarker.setLngLat([at.lon, at.lat]);
-          if (!me.isConnected) meMarker.addTo(map);
+          meMarker.place(map, at, p.coords);
         },
       );
     });
@@ -1800,7 +1800,9 @@ export default function MapView({ className }: { className?: string }) {
       // three seconds whatever happens. The island from its heights stands in till then.
       window.clearTimeout(seaWait);
       if (map.getSource('mb-coast')) {
-        const imagery = ['mb-satellite', 'mb-satellite-close'].filter((id) => map.getLayer(id));
+        const imagery = ['mb-satellite-far', 'mb-satellite', 'mb-satellite-close'].filter((id) =>
+          map.getLayer(id),
+        );
         const show = () => {
           window.clearTimeout(seaWait);
           for (const id of imagery) {
@@ -2116,6 +2118,57 @@ export default function MapView({ className }: { className?: string }) {
     if (map && ready && map.getSource('mb-lines')) apply(map, content, fitted);
   }, [content, ready]);
 
+  // A trip followed, on foot or by bus: the person in the middle of the screen as they go,
+  // the map moving with them, as in Google Maps; their dot with a beam the way the phone
+  // points. A finger dragging the map lets it be looked about; a button brings it back.
+  const follow = content.follow;
+  const following = Boolean(follow);
+  const [followFree, setFollowFree] = useState(false);
+  const followed = useRef<{ me?: MeMarker; zoom?: number; byHand?: boolean; aboard?: boolean }>({});
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !following) return;
+    setFollowFree(false);
+    followed.current = { me: new MeMarker() };
+    // No fitting to a route meanwhile: the camera is the person's.
+    fitted.current = { key: 'follow' };
+    const free = (e: { originalEvent?: Event }) => e.originalEvent && setFollowFree(true);
+    // Zoomed by hand: kept at that zoom.
+    const zoomed = (e: { originalEvent?: Event }) => {
+      if (!e.originalEvent) return;
+      followed.current.zoom = map.getZoom();
+      followed.current.byHand = true;
+    };
+    map.on('dragstart', free);
+    map.on('zoomend', zoomed);
+    return () => {
+      map.off('dragstart', free);
+      map.off('zoomend', zoomed);
+      followed.current.me?.remove();
+      followed.current = {};
+      map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
+    };
+  }, [following, ready]);
+  useEffect(() => {
+    const map = mapRef.current;
+    const f = followed.current;
+    if (!map || !ready || !follow || !f.me) return;
+    if (follow.me === false) f.me.remove();
+    else f.me.place(map, follow);
+    if (followFree) return;
+    const { top, bottom } = fitPadding(map.getContainer(), false);
+    const padding = { top, bottom, left: 0, right: 0 };
+    const center: [number, number] = [follow.lon, follow.lat];
+    // Close in, as a maps app follows: a street on foot, a stretch of road by bus (a zoom
+    // chosen by hand stays).
+    const aboard = follow.me === false;
+    if (f.aboard !== aboard && !f.byHand) f.zoom = undefined;
+    f.aboard = aboard;
+    f.zoom ??= aboard ? 15 : Math.max(map.getZoom(), 16.5);
+    // Gliding from fix to fix, as the person goes: no jumps.
+    map.easeTo({ center, zoom: f.zoom, padding, duration: 1000, easing: (t) => t });
+  }, [follow?.lat, follow?.lon, follow?.me, followFree, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const map = mapRef.current;
     if (map && ready) applyBuses(map, buses);
@@ -2317,6 +2370,12 @@ export default function MapView({ className }: { className?: string }) {
   return (
     <div className={`${className ?? ''} map-wrap${pick ? ' map-wrap--picking' : ''}`}>
       <div ref={container} className="map-canvas" role="region" aria-label={t.t('map.label')} />
+      {following && followFree && (
+        <button type="button" className="map-recentre" onClick={() => setFollowFree(false)}>
+          <LocateFixed size={18} aria-hidden />
+          {t.t('map.recentre')}
+        </button>
+      )}
       {pick && (
         <>
           <div className="map-pick" role="status">
@@ -2946,6 +3005,7 @@ function apply(map: MapLibreMap, content: MapContent, fit: { current: Fit }) {
   (map.getSource('mb-points') as GeoJSONSource | undefined)?.setData(data.points);
   (map.getSource('mb-expressways') as GeoJSONSource | undefined)?.setData(data.expressways);
   if (
+    !content.follow &&
     content.fitKey &&
     content.fitKey !== fit.current.key &&
     content.fit &&

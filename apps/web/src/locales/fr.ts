@@ -212,6 +212,7 @@ export const fr: Dict = {
   'remind.title': 'C’est l’heure de partir pour le bus',
   'remind.body': '{route} à {t} depuis « {stop} »',
   'map.label': 'Carte',
+  'map.recentre': 'Recentrer',
   'map.showStop': 'Voir sur la carte',
   'map.stopTimes': 'Horaires à l’arrêt {stop}',
   'scenic.curral.tag': 'La vallée des nonnes',

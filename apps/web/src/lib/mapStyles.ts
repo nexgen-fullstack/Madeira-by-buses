@@ -152,12 +152,14 @@ function landSources(): Record<string, SourceSpecification> {
   );
 }
 
-function landLayers(): LayerSpecification[] {
+function landLayers(toned = false): LayerSpecification[] {
   return LAND_IMAGES.map(({ id }) => ({
     id: `mb-land-${id}`,
     type: 'raster',
     source: `mb-land-${id}`,
-    paint: { 'raster-fade-duration': 0, 'raster-resampling': 'linear' },
+    paint: toned
+      ? { ...SATELLITE_FAR_PAINT }
+      : { 'raster-fade-duration': 0, 'raster-resampling': 'linear' },
   }));
 }
 
@@ -232,6 +234,23 @@ export const SATELLITE_PAINT = {
 } as const;
 
 /**
+ * Esri's imagery from afar (tile zoom 13 and out) is another picture of the island than close
+ * in: a vivid green against the greyer, sharper one from zoom 14. Toned to it (fitted on
+ * tiles over Madeira: half the colour, a little less contrast), so a far tile standing in while
+ * the close ones come, or the change of picture on zooming, does not show; the island drawn
+ * from its heights is toned the same.
+ */
+export const SATELLITE_FAR_PAINT = {
+  'raster-saturation': -0.35,
+  'raster-contrast': -0.15,
+  'raster-brightness-min': 0.04,
+  'raster-resampling': 'linear',
+  'raster-fade-duration': 0,
+} as const;
+/** The closest tile zoom of the far picture. */
+const SATELLITE_FAR_MAX = 13;
+
+/**
  * The sea round the island: the deep teal of the open ocean rather than the near-black of
  * the imagery, lightening by the shore to a muted turquoise (Madeira's shores are rock and
  * pebbles, not white sand). Painted in bands by distance from the coast (public/coast.json,
@@ -300,10 +319,16 @@ function satelliteLayers(): LayerSpecification[] {
   return [
     { id: 'mb-background', type: 'background', paint: { 'background-color': RESORT_SEA_DEEP } },
     // The island from its heights, under all: never a sea where the land is.
-    ...landLayers(),
-    // One imagery, sharp: no coarse copy under it to be swapped for the sharp one before the
-    // passenger's eyes (another picture of the island, other colours); while its tiles come,
-    // the island from its heights, and those of the zoom before, stand in.
+    ...landLayers(true),
+    // The imagery from afar, toned to the close one (see SATELLITE_FAR_PAINT); close in, it
+    // stands in, enlarged, where the close tiles have not come yet.
+    {
+      id: 'mb-satellite-far',
+      type: 'raster',
+      source: 'mb-satellite-far',
+      paint: { ...SATELLITE_FAR_PAINT },
+    },
+    // Close in (tile zoom 14 to 17), over it.
     {
       id: 'mb-satellite',
       type: 'raster',
@@ -336,10 +361,18 @@ function baseSources(base: BaseLayer): Record<string, SourceSpecification> {
         data: { type: 'FeatureCollection', features: [] },
         tolerance: 0,
       },
+      'mb-satellite-far': {
+        type: 'raster',
+        tiles: [imagery],
+        tileSize,
+        maxzoom: SATELLITE_FAR_MAX,
+        attribution: SATELLITE_ATTRIBUTION,
+      },
       'mb-satellite': {
         type: 'raster',
         tiles: [imagery],
         tileSize,
+        minzoom: SATELLITE_FAR_MAX + 1,
         maxzoom: SATELLITE_MAX,
         attribution: SATELLITE_ATTRIBUTION,
       },

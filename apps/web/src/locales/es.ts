@@ -210,6 +210,7 @@ export const es: Dict = {
   'remind.title': 'Hora de salir hacia el autobús',
   'remind.body': '{route} a las {t} desde «{stop}»',
   'map.label': 'Mapa',
+  'map.recentre': 'Centrar en mí',
   'map.showStop': 'Mostrar en el mapa',
   'map.stopTimes': 'Horario de la parada {stop}',
   'scenic.curral.tag': 'Valle de las monjas',

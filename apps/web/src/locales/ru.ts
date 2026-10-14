@@ -235,6 +235,7 @@ export const ru: Dict = {
   'remind.title': 'Пора выходить к автобусу',
   'remind.body': '{route} в {t} от остановки «{stop}»',
   'map.label': 'Карта',
+  'map.recentre': 'Центрировать на мне',
   'map.showStop': 'Показать на карте',
   'map.stopTimes': 'Расписание остановки {stop}',
   'scenic.curral.tag': 'Долина монахинь',

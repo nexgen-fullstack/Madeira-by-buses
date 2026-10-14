@@ -214,6 +214,7 @@ export const de: Dict = {
   'remind.title': 'Zeit, zum Bus zu gehen',
   'remind.body': '{route} um {t} ab „{stop}“',
   'map.label': 'Karte',
+  'map.recentre': 'Zentrieren',
   'map.showStop': 'Auf der Karte zeigen',
   'map.stopTimes': 'Fahrplan an der Haltestelle {stop}',
   'scenic.curral.tag': 'Das Tal der Nonnen',

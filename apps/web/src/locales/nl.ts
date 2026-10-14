@@ -212,6 +212,7 @@ export const nl: Dict = {
   'remind.title': 'Tijd om naar de bus te gaan',
   'remind.body': '{route} om {t} vanaf «{stop}»',
   'map.label': 'Kaart',
+  'map.recentre': 'Centreren',
   'map.showStop': 'Toon op de kaart',
   'map.stopTimes': 'Dienstregeling bij {stop}',
   'scenic.curral.tag': 'Vallei van de Nonnen',

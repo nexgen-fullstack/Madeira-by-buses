@@ -83,6 +83,7 @@ describe('map styles', () => {
       'mb-land-madeira',
       'mb-land-desertas',
       'mb-land-porto-santo',
+      'mb-satellite-far',
       'mb-satellite',
       'mb-satellite-close',
       'mb-resort-sea',

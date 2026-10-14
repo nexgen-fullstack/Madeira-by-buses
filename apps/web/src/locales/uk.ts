@@ -238,6 +238,7 @@ export const uk = {
   'remind.title': 'Час виходити до автобуса',
   'remind.body': '{route} о {t} від зупинки «{stop}»',
   'map.label': 'Карта',
+  'map.recentre': 'Центрувати на мені',
   'map.showStop': 'Показати на карті',
   'map.stopTimes': 'Розклад зупинки {stop}',
   'scenic.curral.tag': 'Долина черниць',

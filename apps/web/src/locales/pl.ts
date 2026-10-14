@@ -237,6 +237,7 @@ export const pl: Dict = {
   'remind.title': 'Czas wyjść na autobus',
   'remind.body': '{route} o {t} z przystanku „{stop}”',
   'map.label': 'Mapa',
+  'map.recentre': 'Wyśrodkuj',
   'map.showStop': 'Pokaż na mapie',
   'map.stopTimes': 'Rozkład na przystanku {stop}',
   'scenic.curral.tag': 'Dolina zakonnic',

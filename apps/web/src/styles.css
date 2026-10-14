@@ -3817,6 +3817,65 @@ input[type='time'],
 .maplibregl-user-location-dot {
   box-shadow: 0 0 12px 4px rgb(0 232 213 / 70%);
 }
+/* With a beam from it the way the phone points (or, riding, the way they go), as in
+   Google Maps: the marker turns, the beam's tip at the dot. */
+.me-marker {
+  position: relative;
+  width: 15px;
+  height: 15px;
+}
+.me-marker__beam {
+  position: absolute;
+  bottom: 50%;
+  left: 50%;
+  display: none;
+  width: 70px;
+  height: 70px;
+  margin-left: -35px;
+  background: radial-gradient(
+    circle at 50% 100%,
+    rgb(0 232 213 / 70%) 0,
+    rgb(0 232 213 / 35%) 40%,
+    rgb(0 232 213 / 0%) 72%
+  );
+  clip-path: polygon(50% 100%, 14% 0, 86% 0);
+  pointer-events: none;
+}
+.me-marker--beam .me-marker__beam {
+  display: block;
+}
+/* The dot itself, in the app's turquoise (over the map library's own blue). */
+.me-marker .maplibregl-user-location-dot {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background-color: #00e8d5;
+  box-shadow: 0 0 12px 4px rgb(0 232 213 / 70%);
+}
+.me-marker .maplibregl-user-location-dot::before {
+  background-color: #00e8d5;
+}
+
+/* Following a trip, the map moved by hand: back to where the person is. */
+.map-recentre {
+  position: absolute;
+  bottom: calc(var(--map-bottom-inset, 0px) + 18px);
+  left: 50%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--navy);
+  font: inherit;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgb(7 42 107 / 30%);
+  translate: -50% 0;
+  cursor: pointer;
+}
 
 /* The places with a view on the map, by their photos: pins with a round photo in a white
    head and a point down to where they are; their names under the point once the map is

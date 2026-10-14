@@ -235,6 +235,7 @@ export const cs: Dict = {
   'remind.title': 'Čas vyrazit na autobus',
   'remind.body': '{route} v {t} ze zastávky „{stop}“',
   'map.label': 'Mapa',
+  'map.recentre': 'Vycentrovat',
   'map.showStop': 'Ukázat na mapě',
   'map.stopTimes': 'Jízdní řád zastávky {stop}',
   'scenic.curral.tag': 'Údolí jeptišek',

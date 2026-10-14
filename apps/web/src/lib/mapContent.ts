@@ -93,6 +93,12 @@ export interface MapContent {
   fitKey?: string;
   fit?: LatLon[];
   /**
+   * Where the person is on a trip they follow, on foot or by bus: kept in the middle of the
+   * screen as they go, the map moving with them (as in Google Maps), their dot with a beam the
+   * way the phone points; `me: false` aboard, where the bus is the one shown.
+   */
+  follow?: LatLon & { me?: boolean };
+  /**
    * A route chosen to take, which the map shows alone: every other stop and line steps
    * aside. Different for each route.
    */

@@ -110,15 +110,22 @@ export function TripView() {
           ),
         ]
       : [];
-    const me: MapPoint[] =
-      position && !trip?.simulate && !aboard ? [{ ...position, kind: 'user' }] : [];
+    // The person in the middle of the screen as they go, their dot and beam drawn by the map;
+    // aboard, the bus they are in.
+    const follow: MapContent['follow'] =
+      aboard && state?.position
+        ? { lat: state.position.lat, lon: state.position.lon, me: false }
+        : position
+          ? { lat: position.lat, lon: position.lon }
+          : undefined;
     if (walk && phase !== 'ride') {
       return {
         lines: [walkLine!],
-        points: [...walkFlags, ...(position ? [{ ...position, kind: 'user' as const }] : [])],
+        points: walkFlags,
         fitKey: `trip:walk:${phase}:${rideIndex}`,
         fit: walk.path,
         focus: 'trip',
+        ...(follow ? { follow } : {}),
       };
     }
     if (!setup || !ride) return undefined;
@@ -142,7 +149,7 @@ export function TripView() {
       { coords: setup.shape, color: rideColor(rideIndex), width: RIDE_WIDTH, arrows: true },
     ];
     if (walkLine) lines.unshift(walkLine);
-    const all = [...walkFlags, ...points, ...me];
+    const all = [...walkFlags, ...points];
     pairFlags(all);
     return {
       lines,
@@ -150,6 +157,7 @@ export function TripView() {
       fitKey: `trip:${rideIndex}${walk ? ':walk' : ''}`,
       fit: [...setup.shape, ...(walk?.path ?? [])],
       focus: 'trip',
+      ...(follow ? { follow } : {}),
     };
   }, [
     setup,
@@ -159,9 +167,9 @@ export function TripView() {
     walk,
     position,
     phase,
-    trip?.simulate,
     trip?.itinerary.legs,
     aboard,
+    state?.position,
   ]);
   useMapContent(content);
 

@@ -211,6 +211,7 @@ export const en: Dict = {
   'remind.title': 'Time to leave for the bus',
   'remind.body': '{route} at {t} from «{stop}»',
   'map.label': 'Map',
+  'map.recentre': 'Re-centre',
   'map.showStop': 'Show on the map',
   'map.stopTimes': 'Timetable at {stop}',
   'scenic.curral.tag': 'Valley of the Nuns',
