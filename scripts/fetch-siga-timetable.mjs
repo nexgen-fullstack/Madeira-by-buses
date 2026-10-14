@@ -24,8 +24,7 @@ import { join } from 'node:path';
 
 const OUT = join(process.argv[2] ?? 'data/sources/siga', 'timetable');
 const API = 'https://sigadev.imt.madeira.gov.pt/otp/otp/gtfs/v1';
-const UA =
-  'MadeiraBus timetable collector (+https://github.com/nexgen-fullstack/Madeira-by-buses)';
+const UA = 'MadeiraBus timetable collector (+https://github.com/nexgen-fullstack/Madeira-by-buses)';
 const PAUSE = 500;
 /** Routes per request. */
 const BATCH = 40;

@@ -5,9 +5,7 @@
     "lat": 32.7356,
     "lon": -16.9286,
     "provider": "netmadeira",
-    "match": [
-      "arieiro"
-    ],
+    "match": ["arieiro"],
     "high": true
   },
   {
@@ -16,9 +14,7 @@
     "lat": 32.7647,
     "lon": -16.9053,
     "provider": "netmadeira",
-    "match": [
-      "teixeira"
-    ],
+    "match": ["teixeira"],
     "high": true
   },
   {
@@ -27,9 +23,7 @@
     "lat": 32.7107,
     "lon": -16.9603,
     "provider": "netmadeira",
-    "match": [
-      "serrado"
-    ],
+    "match": ["serrado"],
     "high": true
   },
   {
@@ -38,9 +32,7 @@
     "lat": 32.754,
     "lon": -17.132,
     "provider": "netmadeira",
-    "match": [
-      "rabacal"
-    ],
+    "match": ["rabacal"],
     "high": true
   },
   {
@@ -49,9 +41,7 @@
     "lat": 32.746,
     "lon": -16.826,
     "provider": "netmadeira",
-    "match": [
-      "portela"
-    ],
+    "match": ["portela"],
     "high": true
   },
   {
@@ -60,9 +50,7 @@
     "lat": 32.727,
     "lon": -16.816,
     "provider": "netmadeira",
-    "match": [
-      "santo da serra"
-    ],
+    "match": ["santo da serra"],
     "high": true
   },
   {
@@ -71,9 +59,7 @@
     "lat": 32.6762,
     "lon": -16.903,
     "provider": "netmadeira",
-    "match": [
-      "monte"
-    ]
+    "match": ["monte"]
   },
   {
     "id": "funchal-pontinha",
@@ -81,9 +67,7 @@
     "lat": 32.6408,
     "lon": -16.9137,
     "provider": "netmadeira",
-    "match": [
-      "pontinha"
-    ]
+    "match": ["pontinha"]
   },
   {
     "id": "funchal-baia-do-funchal",
@@ -91,9 +75,7 @@
     "lat": 32.644,
     "lon": -16.911,
     "provider": "netmadeira",
-    "match": [
-      "baia do funchal"
-    ]
+    "match": ["baia do funchal"]
   },
   {
     "id": "funchal-lido",
@@ -101,9 +83,7 @@
     "lat": 32.6352,
     "lon": -16.9333,
     "provider": "netmadeira",
-    "match": [
-      "lido"
-    ]
+    "match": ["lido"]
   },
   {
     "id": "funchal-parque-ecologico",
@@ -111,9 +91,7 @@
     "lat": 32.696,
     "lon": -16.902,
     "provider": "netmadeira",
-    "match": [
-      "ecologico"
-    ],
+    "match": ["ecologico"],
     "high": true
   },
   {
@@ -122,9 +100,7 @@
     "lat": 32.662,
     "lon": -16.868,
     "provider": "netmadeira",
-    "match": [
-      "palheiro"
-    ]
+    "match": ["palheiro"]
   },
   {
     "id": "camara-de-lobos",
@@ -132,9 +108,7 @@
     "lat": 32.6489,
     "lon": -16.9774,
     "provider": "netmadeira",
-    "match": [
-      "camara de lobos"
-    ]
+    "match": ["camara de lobos"]
   },
   {
     "id": "camara-de-lobos-baia",
@@ -142,9 +116,7 @@
     "lat": 32.6477,
     "lon": -16.9752,
     "provider": "netmadeira",
-    "match": [
-      "camara de lobos baia"
-    ]
+    "match": ["camara de lobos baia"]
   },
   {
     "id": "praia-do-vigario",
@@ -152,9 +124,7 @@
     "lat": 32.645,
     "lon": -16.994,
     "provider": "netmadeira",
-    "match": [
-      "vigario"
-    ]
+    "match": ["vigario"]
   },
   {
     "id": "ribeira-brava",
@@ -162,9 +132,7 @@
     "lat": 32.6731,
     "lon": -17.0636,
     "provider": "netmadeira",
-    "match": [
-      "ribeira brava"
-    ]
+    "match": ["ribeira brava"]
   },
   {
     "id": "ponta-do-sol",
@@ -172,9 +140,7 @@
     "lat": 32.68,
     "lon": -17.102,
     "provider": "netmadeira",
-    "match": [
-      "ponta do sol"
-    ]
+    "match": ["ponta do sol"]
   },
   {
     "id": "santa-cruz",
@@ -182,9 +148,7 @@
     "lat": 32.688,
     "lon": -16.792,
     "provider": "netmadeira",
-    "match": [
-      "santa cruz"
-    ]
+    "match": ["santa cruz"]
   },
   {
     "id": "machico",
@@ -192,9 +156,7 @@
     "lat": 32.7178,
     "lon": -16.7667,
     "provider": "netmadeira",
-    "match": [
-      "machico"
-    ]
+    "match": ["machico"]
   },
   {
     "id": "canical",
@@ -202,9 +164,7 @@
     "lat": 32.7387,
     "lon": -16.7383,
     "provider": "netmadeira",
-    "match": [
-      "canical"
-    ]
+    "match": ["canical"]
   },
   {
     "id": "praia-faial",
@@ -212,9 +172,7 @@
     "lat": 32.79,
     "lon": -16.846,
     "provider": "netmadeira",
-    "match": [
-      "faial"
-    ]
+    "match": ["faial"]
   },
   {
     "id": "santana-parque-tematico",
@@ -222,9 +180,7 @@
     "lat": 32.807,
     "lon": -16.879,
     "provider": "netmadeira",
-    "match": [
-      "santana"
-    ]
+    "match": ["santana"]
   },
   {
     "id": "sao-jorge",
@@ -232,9 +188,7 @@
     "lat": 32.83,
     "lon": -16.91,
     "provider": "netmadeira",
-    "match": [
-      "sao jorge"
-    ]
+    "match": ["sao jorge"]
   },
   {
     "id": "boaventura",
@@ -242,9 +196,7 @@
     "lat": 32.8178,
     "lon": -16.9894,
     "provider": "netmadeira",
-    "match": [
-      "boaventura"
-    ]
+    "match": ["boaventura"]
   },
   {
     "id": "ponta-delgada",
@@ -252,9 +204,7 @@
     "lat": 32.8253,
     "lon": -16.9906,
     "provider": "netmadeira",
-    "match": [
-      "ponta delgada"
-    ]
+    "match": ["ponta delgada"]
   },
   {
     "id": "seixal",
@@ -262,9 +212,7 @@
     "lat": 32.824,
     "lon": -17.111,
     "provider": "netmadeira",
-    "match": [
-      "seixal"
-    ]
+    "match": ["seixal"]
   },
   {
     "id": "porto-moniz",
@@ -272,9 +220,7 @@
     "lat": 32.8666,
     "lon": -17.1696,
     "provider": "netmadeira",
-    "match": [
-      "porto moniz"
-    ]
+    "match": ["porto moniz"]
   },
   {
     "id": "porto-santo",
@@ -282,9 +228,7 @@
     "lat": 33.0612,
     "lon": -16.3388,
     "provider": "netmadeira",
-    "match": [
-      "porto santo"
-    ]
+    "match": ["porto santo"]
   },
   {
     "id": "mw-calheta",
@@ -292,9 +236,7 @@
     "lat": 32.7232,
     "lon": -17.1766,
     "provider": "madeiraweb",
-    "match": [
-      "calheta"
-    ]
+    "match": ["calheta"]
   },
   {
     "id": "mw-porto-moniz",
@@ -302,10 +244,7 @@
     "lat": 32.867,
     "lon": -17.17,
     "provider": "madeiraweb",
-    "match": [
-      "porto moniz",
-      "360"
-    ]
+    "match": ["porto moniz", "360"]
   },
   {
     "id": "mw-reis-magos",
@@ -313,9 +252,7 @@
     "lat": 32.639,
     "lon": -16.824,
     "provider": "madeiraweb",
-    "match": [
-      "reis magos"
-    ]
+    "match": ["reis magos"]
   },
   {
     "id": "mw-airport",
@@ -323,9 +260,7 @@
     "lat": 32.695,
     "lon": -16.775,
     "provider": "madeiraweb",
-    "match": [
-      "airport"
-    ]
+    "match": ["airport"]
   },
   {
     "id": "mw-arriaga",
@@ -333,9 +268,7 @@
     "lat": 32.6477,
     "lon": -16.9095,
     "provider": "madeiraweb",
-    "match": [
-      "ritz"
-    ]
+    "match": ["ritz"]
   },
   {
     "id": "mw-marina-1",
@@ -343,10 +276,7 @@
     "lat": 32.6458,
     "lon": -16.9105,
     "provider": "madeiraweb",
-    "match": [
-      "marina",
-      "1"
-    ]
+    "match": ["marina", "1"]
   },
   {
     "id": "mw-marina-2",
@@ -354,9 +284,6 @@
     "lat": 32.6452,
     "lon": -16.9085,
     "provider": "madeiraweb",
-    "match": [
-      "marina",
-      "2"
-    ]
+    "match": ["marina", "2"]
   }
 ]
