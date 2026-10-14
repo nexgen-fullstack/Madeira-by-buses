@@ -223,23 +223,10 @@ function reliefLayers(): LayerSpecification[] {
 }
 
 /**
- * The imagery a touch lighter and livelier than it comes, as a maps app shows it: the deep
- * ocean and the laurel forest are nearly black in it, which on a phone in the sun reads as
- * a dark blot; lifted only a little, so it does not turn hazy.
+ * The imagery as it is, a photograph not recoloured: no lift, contrast or colour added (the
+ * sea is painted over it anyway, see `resortSea`).
  */
 export const SATELLITE_PAINT = {
-  'raster-brightness-min': 0.06,
-  'raster-brightness-max': 1,
-  'raster-contrast': 0.08,
-  'raster-saturation': 0.12,
-  'raster-resampling': 'linear',
-} as const;
-
-export const SATELLITE_CLOSE_PAINT = {
-  'raster-brightness-min': 0,
-  'raster-brightness-max': 1,
-  'raster-contrast': 0.16,
-  'raster-saturation': 0.22,
   'raster-resampling': 'linear',
   'raster-fade-duration': 120,
 } as const;
@@ -248,8 +235,9 @@ export const SATELLITE_CLOSE_PAINT = {
  * The sea round the island: the deep teal of the open ocean rather than the near-black of
  * the imagery, lightening by the shore to a muted turquoise (Madeira's shores are rock and
  * pebbles, not white sand). Painted in bands by distance from the coast (public/coast.json,
- * scripts/coast-line.py), opaque enough out at sea that the seams between the imagery's
- * pictures do not show, clearer near the shore, where the surf and the rocks show through.
+ * scripts/coast-line.py), opaque out at sea, so neither the seams between the imagery's
+ * pictures nor its tiles still coming show, clearer near the shore, where the surf and the
+ * rocks show through.
  */
 export const RESORT_SEA = '#126e89';
 /** The sea before its bands come, and wherever there are none. */
@@ -259,35 +247,15 @@ const RESORT_SEA_MAP = '#8fdbe3';
 
 /** The sea by the rocks and out at sea: colour and opacity, with the distance between faded. */
 const SHORE_SEA = { color: '#2a98a1', opacity: 0.46 };
-const OPEN_SEA = { color: RESORT_SEA, opacity: 0.93 };
+const OPEN_SEA = { color: RESORT_SEA, opacity: 1 };
 /** From the shore out to here (m) the sea fades from the one to the other. */
 const FADE_OUT = 300;
 
 /**
- * From this zoom the sea is painted in its bands; further out the bands are thinner than a
- * pixel, and the map, simplifying them to draw, breaks them into shapes over the land.
+ * The sea in its bands, at every zoom: from the app's own file, so never waiting on the
+ * network (the vector tiles' sea did, and the imagery's black sea showed meanwhile).
  */
-const BANDS_FROM = 10.5;
-
-/** Far out, the sea as the vector tiles have it, in the open sea's colour. */
-function openSeaFar(source: string): LayerSpecification {
-  return {
-    id: 'mb-resort-sea-far',
-    type: 'fill',
-    source,
-    'source-layer': 'water',
-    maxzoom: BANDS_FROM,
-    filter: ['all', ['!=', ['get', 'brunnel'], 'tunnel'], ['!=', ['get', 'class'], 'river']],
-    paint: {
-      'fill-color': OPEN_SEA.color,
-      'fill-opacity': OPEN_SEA.opacity,
-      'fill-antialias': false,
-    },
-  } as LayerSpecification;
-}
-
-/** The sea in its bands, from `from` in (all the way out where the vector tiles' sea is not had). */
-function resortSea(from = BANDS_FROM): LayerSpecification {
+function resortSea(): LayerSpecification {
   // Smoothly by the band's distance from the shore: no step to see between the bands.
   const fade = (near: string | number, far: string | number): ExpressionSpecification => [
     'interpolate',
@@ -303,7 +271,6 @@ function resortSea(from = BANDS_FROM): LayerSpecification {
     id: 'mb-resort-sea',
     type: 'fill',
     source: 'mb-coast',
-    minzoom: from,
     paint: {
       'fill-color': fade(SHORE_SEA.color, OPEN_SEA.color),
       'fill-antialias': true,
@@ -334,15 +301,9 @@ function satelliteLayers(): LayerSpecification[] {
     { id: 'mb-background', type: 'background', paint: { 'background-color': RESORT_SEA_DEEP } },
     // The island from its heights, under all: never a sea where the land is.
     ...landLayers(),
-    // Under the sharp imagery, the same in tiles four times as large (a sixteenth of the
-    // requests): there at once on a slow phone, so a place newly in view is never a dark
-    // hole while its sharp tiles come.
-    {
-      id: 'mb-satellite-quick',
-      type: 'raster',
-      source: 'mb-satellite-quick',
-      paint: { ...SATELLITE_PAINT, 'raster-fade-duration': 0 },
-    },
+    // One imagery, sharp: no coarse copy under it to be swapped for the sharp one before the
+    // passenger's eyes (another picture of the island, other colours); while its tiles come,
+    // the island from its heights, and those of the zoom before, stand in.
     {
       id: 'mb-satellite',
       type: 'raster',
@@ -356,9 +317,7 @@ function satelliteLayers(): LayerSpecification[] {
       type: 'raster',
       source: 'mb-satellite-close',
       minzoom: handOver - 0.5,
-      // Close in, the streets and roofs as they are: no lift of the shadows (which washes
-      // them out), a little more contrast and colour.
-      paint: { ...SATELLITE_CLOSE_PAINT },
+      paint: { ...SATELLITE_PAINT },
     },
   ];
 }
@@ -376,13 +335,6 @@ function baseSources(base: BaseLayer): Record<string, SourceSpecification> {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
         tolerance: 0,
-      },
-      'mb-satellite-quick': {
-        type: 'raster',
-        tiles: [imagery],
-        tileSize: 512,
-        maxzoom: SATELLITE_MAX,
-        attribution: SATELLITE_ATTRIBUTION,
       },
       'mb-satellite': {
         type: 'raster',
@@ -408,8 +360,7 @@ export function fallbackStyle(base: BaseLayer): StyleSpecification {
   return {
     version: 8,
     sources: baseSources(base === 'map' ? 'relief' : base),
-    // Over the imagery its sea, all the way out (there is no other here).
-    layers: base === 'satellite' ? [...satelliteLayers(), resortSea(0)] : reliefLayers(),
+    layers: base === 'satellite' ? [...satelliteLayers(), resortSea()] : reliefLayers(),
   };
 }
 
@@ -426,11 +377,7 @@ export function overlayVector(
   base: Exclude<BaseLayer, 'map'>,
 ): StyleSpecification {
   const keepLines = new Set(['transportation', 'boundary', 'aeroway']);
-  const water = vector.layers.find((l) => l.type === 'fill' && sourceLayer(l) === 'water');
-  const kept: LayerSpecification[] =
-    base === 'satellite' && water && 'source' in water
-      ? [openSeaFar(water.source), resortSea()]
-      : [];
+  const kept: LayerSpecification[] = base === 'satellite' ? [resortSea()] : [];
   for (const layer of vector.layers) {
     if (layer.type === 'symbol' || layer.type === 'fill-extrusion') {
       kept.push(base === 'satellite' && layer.type === 'symbol' ? brightText(layer) : layer);

@@ -25,6 +25,7 @@ import {
   type FilterSpecification,
   type GeoJSONSource,
   type MapMouseEvent,
+  type MapSourceDataEvent,
   type StyleSpecification,
 } from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
@@ -1780,6 +1781,7 @@ export default function MapView({ className }: { className?: string }) {
     const foldCredits = foldAttribution(map);
     map.on('dragstart', foldCredits);
     map.once('load', hideLaunch);
+    let seaWait: number | undefined;
     map.on('style.load', () => {
       styleLoaded.current = true;
       baseFilters.delete(map);
@@ -1793,12 +1795,32 @@ export default function MapView({ className }: { className?: string }) {
       applyBuses(map, busesRef.current);
       void applyPois(map, poisRef.current);
       void applyAllPois(map, allPoisRef.current.pois, allPoisRef.current.on);
-      // The satellite map's sea, in its bands by distance from the shore.
-      if (map.getSource('mb-coast'))
+      // The satellite map's sea, in its bands by distance from the shore; the imagery shown
+      // once the sea lies over it (its own sea is near black: dark squares meanwhile), or after
+      // three seconds whatever happens. The island from its heights stands in till then.
+      window.clearTimeout(seaWait);
+      if (map.getSource('mb-coast')) {
+        const imagery = ['mb-satellite', 'mb-satellite-close'].filter((id) => map.getLayer(id));
+        const show = () => {
+          window.clearTimeout(seaWait);
+          for (const id of imagery) {
+            if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
+          }
+        };
+        for (const id of imagery) map.setLayoutProperty(id, 'visibility', 'none');
+        seaWait = window.setTimeout(show, 3000);
         void loadSea().then((sea) => {
           const source = map.getSource('mb-coast') as GeoJSONSource | undefined;
-          if (sea && source) source.setData(sea);
+          if (!sea || !source) return show();
+          const drawn = (e: MapSourceDataEvent) => {
+            if (e.sourceId !== 'mb-coast' || !map.isSourceLoaded('mb-coast')) return;
+            map.off('sourcedata', drawn);
+            show();
+          };
+          map.on('sourcedata', drawn);
+          source.setData(sea);
         });
+      }
     });
     // Close to the streets the first time: their shops and cafés are loaded.
     const nearTheStreets = () => map.getZoom() >= 12.5 && setNearStreets(true);
@@ -2043,6 +2065,7 @@ export default function MapView({ className }: { className?: string }) {
     return () => {
       removed = true;
       window.clearTimeout(prefetching);
+      window.clearTimeout(seaWait);
       window.removeEventListener('mb-map-inset', onInset);
       window.removeEventListener('mb-map-inset', covered);
       window.clearTimeout(settled);

@@ -83,10 +83,8 @@ describe('map styles', () => {
       'mb-land-madeira',
       'mb-land-desertas',
       'mb-land-porto-santo',
-      'mb-satellite-quick',
       'mb-satellite',
       'mb-satellite-close',
-      'mb-resort-sea-far',
       'mb-resort-sea',
       'road',
       'building-3d',
@@ -141,9 +139,10 @@ describe('map styles', () => {
   it('falls back to tile-free styles', () => {
     expect(ids(fallbackStyle('map'))).toContain('mb-relief');
     expect(ids(fallbackStyle('satellite'))).toContain('mb-satellite');
-    // Its sea in the bands all the way out: there is no other sea there.
+    // Its sea in the bands, the app's own, at every zoom.
     const sea = fallbackStyle('satellite').layers.find((l) => l.id === 'mb-resort-sea');
-    expect(sea).toMatchObject({ type: 'fill', source: 'mb-coast', minzoom: 0 });
+    expect(sea).toMatchObject({ type: 'fill', source: 'mb-coast' });
+    expect(sea).not.toHaveProperty('minzoom');
   });
 
   it('lays the islands drawn from their heights under the imagery, built into the app', () => {

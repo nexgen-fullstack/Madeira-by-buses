@@ -76,6 +76,18 @@ describe("the map's files on the phone", () => {
     await expect(loadCached({ url: url.replace('1850', '1851'), type: 'image' })).rejects.toThrow();
   });
 
+  it('fetches a tile asked for twice at once only once', async () => {
+    const { loadCached } = await fresh(async () => bytes(77));
+    const url = 'mbc://clarity.maptiles.arcgis.com/x/tile/11/826/927';
+    const [a, b] = await Promise.all([
+      loadCached({ url, type: 'image' }),
+      loadCached({ url, type: 'image' }),
+    ]);
+    expect((a.data as ArrayBuffer).byteLength).toBe(77);
+    expect((b.data as ArrayBuffer).byteLength).toBe(77);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("gives a tile set's index with its tiles through the cache too", async () => {
     const { loadCached } = await fresh(
       async () =>

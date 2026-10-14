@@ -159,27 +159,50 @@ export async function loadCached(
   const hit = await lookup(url);
   if (hit && Date.now() - storedAt(hit) < maxAge(url))
     return { data: await decode(hit, params.type) };
+  // Asked for twice at once (the map's style swapped while its tiles were coming): once on
+  // the network.
+  const coming = onTheWay.get(url);
+  if (coming) {
+    try {
+      return { data: await decode(new Response(await coming), params.type) };
+    } catch (err) {
+      if (abort?.signal.aborted) throw err;
+      // The other asker gave up: on its own.
+    }
+  }
   const tile = pictureZoom(url);
-  if (tile !== undefined && !(await turn(tile, abort?.signal)))
-    throw new DOMException('Aborted', 'AbortError');
-  if (tile === undefined) urgent++;
-  // An older copy: the network gets a few seconds, then the copy does.
-  const wait = hit ? withTimeout(abort?.signal, 4000) : undefined;
+  const bytes = (async () => {
+    if (tile !== undefined && !(await turn(tile, abort?.signal)))
+      throw new DOMException('Aborted', 'AbortError');
+    if (tile === undefined) urgent++;
+    // An older copy: the network gets a few seconds, then the copy does.
+    const wait = hit ? withTimeout(abort?.signal, 4000) : undefined;
+    try {
+      const res = await fetch(url, { signal: wait?.signal ?? abort?.signal });
+      if (!res.ok) throw new HttpError(res.status, url);
+      const body = await res.arrayBuffer();
+      void store(url, new Response(body, { headers: res.headers }));
+      return body;
+    } finally {
+      wait?.done();
+      if (tile === undefined) urgent--;
+      else pictures--;
+      nextTurn();
+    }
+  })();
+  onTheWay.set(url, bytes);
   try {
-    const res = await fetch(url, { signal: wait?.signal ?? abort?.signal });
-    if (!res.ok) throw new HttpError(res.status, url);
-    void store(url, res.clone());
-    return { data: await decode(res, params.type) };
+    return { data: await decode(new Response(await bytes), params.type) };
   } catch (err) {
     if (hit && !abort?.signal.aborted) return { data: await decode(hit, params.type) };
     throw err;
   } finally {
-    wait?.done();
-    if (tile === undefined) urgent--;
-    else pictures--;
-    nextTurn();
+    if (onTheWay.get(url) === bytes) onTheWay.delete(url);
   }
 }
+
+/** The files on their way from the network, by address. */
+const onTheWay = new Map<string, Promise<ArrayBuffer>>();
 
 /*
  * On a slow connection every file shares the little there is: the imagery takes its turn, so
