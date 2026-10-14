@@ -81,6 +81,7 @@ describe('map styles', () => {
       'mb-satellite-quick',
       'mb-satellite',
       'mb-satellite-close',
+      'mb-resort-sea-far',
       'mb-resort-sea',
       'road',
       'building-3d',

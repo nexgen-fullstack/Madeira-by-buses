@@ -218,40 +218,58 @@ const RESORT_SEA_DEEP = '#126e89';
 /** The sea of the plain map, a lighter turquoise. */
 const RESORT_SEA_MAP = '#8fdbe3';
 
+/** The sea by the rocks and out at sea: colour and opacity, with the distance between faded. */
+const SHORE_SEA = { color: '#2a98a1', opacity: 0.46 };
+const OPEN_SEA = { color: RESORT_SEA, opacity: 0.93 };
+/** From the shore out to here (m) the sea fades from the one to the other. */
+const FADE_OUT = 300;
+
 /**
- * The sea's colour and opacity by how far out a band ends (m; 9999: the open sea): from a
- * muted turquoise by the rocks to the deep teal, in small steps that read as one fade.
+ * From this zoom the sea is painted in its bands; further out the bands are thinner than a
+ * pixel, and the map, simplifying them to draw, breaks them into shapes over the land.
  */
-const SEA_FADE: [number, string, number][] = [
-  [20, '#2a98a1', 0.46],
-  [45, '#26919d', 0.55],
-  [75, '#228a99', 0.63],
-  [110, '#1e8395', 0.71],
-  [155, '#1a7c91', 0.78],
-  [210, '#16768d', 0.84],
-  [280, '#14718b', 0.89],
-  [9999, RESORT_SEA, 0.93],
-];
+const BANDS_FROM = 10.5;
+
+/** Far out, the sea as the vector tiles have it, in the open sea's colour. */
+function openSeaFar(source: string): LayerSpecification {
+  return {
+    id: 'mb-resort-sea-far',
+    type: 'fill',
+    source,
+    'source-layer': 'water',
+    maxzoom: BANDS_FROM,
+    filter: ['all', ['!=', ['get', 'brunnel'], 'tunnel'], ['!=', ['get', 'class'], 'river']],
+    paint: {
+      'fill-color': OPEN_SEA.color,
+      'fill-opacity': OPEN_SEA.opacity,
+      'fill-antialias': false,
+    },
+  } as LayerSpecification;
+}
 
 function resortSea(): LayerSpecification {
-  const by = (i: 1 | 2): ExpressionSpecification =>
-    [
-      'match',
-      ['get', 'd'],
-      ...SEA_FADE.flatMap((b) => [b[0], b[i]]),
-      SEA_FADE.at(-1)![i],
-    ] as unknown as ExpressionSpecification;
+  // Smoothly by the band's distance from the shore: no step to see between the bands.
+  const fade = (near: string | number, far: string | number): ExpressionSpecification => [
+    'interpolate',
+    ['linear'],
+    ['get', 'd'],
+    0,
+    near,
+    FADE_OUT,
+    far,
+  ];
+  const opacity = fade(SHORE_SEA.opacity, OPEN_SEA.opacity);
   return {
     id: 'mb-resort-sea',
     type: 'fill',
     source: 'mb-coast',
+    minzoom: BANDS_FROM,
     paint: {
-      'fill-color': by(1),
-      // Edges smoothed, so the bands meet without a seam.
+      'fill-color': fade(SHORE_SEA.color, OPEN_SEA.color),
       'fill-antialias': true,
       'fill-outline-color': 'rgba(0, 0, 0, 0)',
       // Close in a little clearer still: the surf, the boats, the harbour walls.
-      'fill-opacity': ['interpolate', ['linear'], ['zoom'], 15, by(2), 18, ['*', 0.8, by(2)]],
+      'fill-opacity': ['interpolate', ['linear'], ['zoom'], 15, opacity, 18, ['*', 0.8, opacity]],
     },
   } as LayerSpecification;
 }
@@ -307,13 +325,8 @@ function baseSources(base: BaseLayer): Record<string, SourceSpecification> {
   if (base === 'satellite') {
     const tileSize = satelliteTileSize();
     return {
-      'mb-coast': {
-        type: 'geojson',
-        data:
-          typeof location === 'undefined'
-            ? `${import.meta.env.BASE_URL}coast.json`
-            : new URL(`${import.meta.env.BASE_URL}coast.json`, location.href).href,
-      },
+      // The sea's bands come once the app has them (lib/sea.ts).
+      'mb-coast': { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
       'mb-satellite-quick': {
         type: 'raster',
         tiles: [SATELLITE_TILES],
@@ -364,7 +377,9 @@ export function overlayVector(
   const keepLines = new Set(['transportation', 'boundary', 'aeroway']);
   const water = vector.layers.find((l) => l.type === 'fill' && sourceLayer(l) === 'water');
   const kept: LayerSpecification[] =
-    base === 'satellite' && water && 'source' in water ? [resortSea()] : [];
+    base === 'satellite' && water && 'source' in water
+      ? [openSeaFar(water.source), resortSea()]
+      : [];
   for (const layer of vector.layers) {
     if (layer.type === 'symbol' || layer.type === 'fill-extrusion') {
       kept.push(base === 'satellite' && layer.type === 'symbol' ? brightText(layer) : layer);

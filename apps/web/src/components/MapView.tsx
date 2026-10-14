@@ -33,6 +33,7 @@ import { useI18n } from '../i18n.ts';
 import { luminance, readableOn } from '../lib/color.ts';
 import { decodePlace, encodePlace } from '../lib/itinerary.ts';
 import { rememberPosition } from '../lib/geolocation.ts';
+import { loadSea } from '../lib/sea.ts';
 import { Snapper } from '../lib/snap.ts';
 import { placePhoto, type PlacePhoto } from '../lib/placePhoto.ts';
 import { hideLaunch } from '../lib/launch.ts';
@@ -1780,6 +1781,12 @@ export default function MapView({ className }: { className?: string }) {
       applyBuses(map, busesRef.current);
       void applyPois(map, poisRef.current);
       void applyAllPois(map, allPoisRef.current.pois, allPoisRef.current.on);
+      // The satellite map's sea, in its bands by distance from the shore.
+      if (map.getSource('mb-coast'))
+        void loadSea().then((sea) => {
+          const source = map.getSource('mb-coast') as GeoJSONSource | undefined;
+          if (sea && source) source.setData(sea);
+        });
     });
     // Close to the streets the first time: their shops and cafés are loaded.
     const nearTheStreets = () => map.getZoom() >= 12.5 && setNearStreets(true);
