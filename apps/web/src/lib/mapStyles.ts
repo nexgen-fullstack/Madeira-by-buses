@@ -1,4 +1,5 @@
 import type {
+  ExpressionSpecification,
   FilterSpecification,
   LayerSpecification,
   SourceSpecification,
@@ -206,15 +207,55 @@ export const SATELLITE_CLOSE_PAINT = {
 } as const;
 
 /**
- * The sea of a resort: turquoise rather than the near-black of the deep ocean in the
- * imagery. Laid over the imagery along the coastline of the vector tiles, strong with the
- * whole island in view and fainter close in, where the surf and the beaches show through.
+ * The sea of a resort: the deep teal of the open ocean round the island rather than the
+ * near-black of the imagery, and (see `resortShallows`) bright clear turquoise along the
+ * shore, as the sea is by a resort's beach. Laid over the imagery along the coastline of
+ * the vector tiles, a little lighter close in, where the surf and the boats show through.
  */
-export const RESORT_SEA = '#1fc3d0';
+export const RESORT_SEA = '#126e89';
+/** The shallows along the shore: clear turquoise. */
+export const RESORT_SHALLOWS = '#3fd6d2';
 /** The sea before its tiles come, and wherever there are none. */
-const RESORT_SEA_DEEP = '#178fa6';
+const RESORT_SEA_DEEP = '#126e89';
 /** The sea of the plain map, a lighter turquoise. */
 const RESORT_SEA_MAP = '#8fdbe3';
+
+/** The shallows' band along the coast, and how far out from the shore its middle is (m). */
+const SHALLOWS_WIDE = 170;
+/** A width in metres as pixels at each zoom (at Madeira's latitude), for a line's paint. */
+const metres = (m: number): ExpressionSpecification => [
+  'interpolate',
+  ['exponential', 2],
+  ['zoom'],
+  8,
+  (m * 2 ** 8) / 131_900,
+  20,
+  (m * 2 ** 20) / 131_900,
+];
+
+/**
+ * The turquoise shallows: a soft band along the coastline (public/coast.json, from
+ * OpenStreetMap by scripts/coast-line.py), on the sea's side of it (OpenStreetMap draws
+ * a coast with the land on its left), fading out to the deep teal.
+ */
+function resortShallows(): LayerSpecification[] {
+  return [
+    {
+      id: 'mb-shallows',
+      type: 'line',
+      source: 'mb-coast',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': RESORT_SHALLOWS,
+        'line-width': metres(SHALLOWS_WIDE),
+        // Out to sea a little only: a big offset turns every bend of the shore into a spike.
+        'line-offset': metres(SHALLOWS_WIDE * 0.28),
+        'line-blur': metres(SHALLOWS_WIDE),
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], 9, 0.75, 13, 0.7, 17, 0.55],
+      },
+    } as LayerSpecification,
+  ];
+}
 
 /** Water that is sea, a lake, a reservoir or a pool — not a river bed (dry most of the year). */
 const STANDING_WATER: FilterSpecification = [
@@ -238,15 +279,15 @@ function resortSea(source: string): LayerSpecification {
         ['linear'],
         ['zoom'],
         6,
-        0.85,
+        0.92,
         11,
-        0.74,
+        0.88,
         14,
-        0.5,
+        0.78,
         16,
-        0.3,
+        0.6,
         18,
-        0.14,
+        0.4,
       ],
     },
   } as LayerSpecification;
@@ -303,6 +344,13 @@ function baseSources(base: BaseLayer): Record<string, SourceSpecification> {
   if (base === 'satellite') {
     const tileSize = satelliteTileSize();
     return {
+      'mb-coast': {
+        type: 'geojson',
+        data:
+          typeof location === 'undefined'
+            ? `${import.meta.env.BASE_URL}coast.json`
+            : new URL(`${import.meta.env.BASE_URL}coast.json`, location.href).href,
+      },
       'mb-satellite-quick': {
         type: 'raster',
         tiles: [SATELLITE_TILES],
@@ -353,7 +401,9 @@ export function overlayVector(
   const keepLines = new Set(['transportation', 'boundary', 'aeroway']);
   const water = vector.layers.find((l) => l.type === 'fill' && sourceLayer(l) === 'water');
   const kept: LayerSpecification[] =
-    base === 'satellite' && water && 'source' in water ? [resortSea(water.source)] : [];
+    base === 'satellite' && water && 'source' in water
+      ? [resortSea(water.source), ...resortShallows()]
+      : [];
   for (const layer of vector.layers) {
     if (layer.type === 'symbol' || layer.type === 'fill-extrusion') {
       kept.push(base === 'satellite' && layer.type === 'symbol' ? brightText(layer) : layer);

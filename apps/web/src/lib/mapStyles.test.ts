@@ -82,6 +82,7 @@ describe('map styles', () => {
       'mb-satellite',
       'mb-satellite-close',
       'mb-resort-sea',
+      'mb-shallows',
       'road',
       'building-3d',
       'poi',

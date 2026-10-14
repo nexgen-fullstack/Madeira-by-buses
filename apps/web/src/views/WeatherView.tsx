@@ -193,6 +193,7 @@ export function WeatherView({ route }: { route: Route }) {
                 {Math.round(chosen.now.temp)}°
                 <span className="weather-now__when">
                   {weatherWord('now', lang)} · {chosen.now.time.slice(11, 16)}
+                  {chosen.now.measured && <> · {weatherWord('measured', lang)}</>}
                 </span>
               </div>
               <div className="strong">{chosen.place.name}</div>

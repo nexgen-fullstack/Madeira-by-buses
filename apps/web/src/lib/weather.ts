@@ -1,5 +1,6 @@
 import type { Lang } from '../i18n.ts';
 import { haversine, type LatLon } from '@madeirabus/engine';
+import { loadMeasured, withMeasured } from './observed.ts';
 import { load, save } from './storage.ts';
 
 /**
@@ -90,6 +91,8 @@ export interface WeatherNow {
   /** mm in the last quarter of an hour. */
   rain: number;
   cloud: number;
+  /** Its temperature from IPMA's stations near it, not the model's (see observed.ts). */
+  measured?: boolean;
 }
 
 export interface WeatherHour {
@@ -317,7 +320,12 @@ let pending: Promise<{ at: number; forecasts: Forecast[] } | undefined> | undefi
  * The forecast for every part of the island: fresh from Open-Meteo at most every quarter
  * of an hour, else the last one kept (offline: however old, with when it was fetched).
  */
-export function loadWeather(): Promise<{ at: number; forecasts: Forecast[] } | undefined> {
+export async function loadWeather(): Promise<{ at: number; forecasts: Forecast[] } | undefined> {
+  const [w, measured] = await Promise.all([loadModelWeather(), loadMeasured()]);
+  return w && { ...w, forecasts: w.forecasts.map((f) => withMeasured(f, measured)) };
+}
+
+function loadModelWeather(): Promise<{ at: number; forecasts: Forecast[] } | undefined> {
   const kept = load<{ at: number; forecasts: Forecast[] } | undefined>(CACHE, undefined);
   if (kept && Date.now() - kept.at < FRESH) return Promise.resolve(kept);
   pending ??= (async () => {
@@ -395,7 +403,12 @@ const full = new Map<string, { at: number; forecast: Promise<Forecast | undefine
  * rougher), at the height of the ground there (Open-Meteo's own map of heights: on Pico do
  * Arieiro, the summit's weather). Kept a quarter of an hour.
  */
-export function loadFullForecast(place: WeatherPlace): Promise<Forecast | undefined> {
+export async function loadFullForecast(place: WeatherPlace): Promise<Forecast | undefined> {
+  const [f, measured] = await Promise.all([loadModelForecast(place), loadMeasured()]);
+  return f && withMeasured(f, measured);
+}
+
+function loadModelForecast(place: WeatherPlace): Promise<Forecast | undefined> {
   const kept = full.get(place.id);
   if (kept && Date.now() - kept.at < FRESH) return kept.forecast;
   const forecast = (async () => {
@@ -605,6 +618,7 @@ const WORDS = {
   days: { uk: 'На тиждень', en: 'This week', pt: 'Esta semana', es: 'Esta semana', fr: 'Cette semaine', it: 'Questa settimana', de: 'Diese Woche', nl: 'Deze week', cs: 'Tento týden', pl: 'Ten tydzień', ru: 'На неделю' },
   island: { uk: 'Де зараз сонце', en: 'Where the sun is now', pt: 'Onde está o sol agora', es: 'Dónde hace sol ahora', fr: 'Où est le soleil', it: 'Dov’è il sole adesso', de: 'Wo jetzt die Sonne scheint', nl: 'Waar nu de zon is', cs: 'Kde teď svítí slunce', pl: 'Gdzie teraz świeci słońce', ru: 'Где сейчас солнце' },
   islandHint: { uk: 'Погода на Мадейрі різна за кілька кілометрів: на півдні сонце, на півночі й у горах — хмари. Торкніться місця.', en: 'Madeira’s weather changes within a few kilometres: sun in the south, clouds in the north and the mountains. Tap a place.', pt: 'O tempo na Madeira muda em poucos quilómetros: sol a sul, nuvens a norte e nas serras. Toque num local.', es: 'El tiempo en Madeira cambia en pocos kilómetros: sol en el sur, nubes en el norte y la montaña. Toque un lugar.', fr: 'À Madère, le temps change en quelques kilomètres : soleil au sud, nuages au nord et en montagne. Touchez un lieu.', it: 'A Madeira il tempo cambia in pochi chilometri: sole a sud, nuvole a nord e in montagna. Tocca un luogo.', de: 'Auf Madeira ändert sich das Wetter auf wenigen Kilometern: Sonne im Süden, Wolken im Norden und in den Bergen. Ort antippen.', nl: 'Het weer op Madeira verandert binnen een paar kilometer: zon in het zuiden, wolken in het noorden en in de bergen. Tik op een plaats.', cs: 'Počasí na Madeiře se mění na pár kilometrech: na jihu slunce, na severu a v horách mraky. Klepněte na místo.', pl: 'Pogoda na Maderze zmienia się co kilka kilometrów: słońce na południu, chmury na północy i w górach. Dotknij miejsca.', ru: 'Погода на Мадейре меняется через несколько километров: на юге солнце, на севере и в горах — облака. Нажмите на место.' },
+  measured: { uk: 'за станціями IPMA', en: 'measured by IPMA stations', pt: 'medido pelas estações do IPMA', es: 'medido por estaciones del IPMA', fr: 'mesuré par les stations de l’IPMA', it: 'misurato dalle stazioni IPMA', de: 'gemessen von IPMA-Stationen', nl: 'gemeten door IPMA-stations', cs: 'naměřeno stanicemi IPMA', pl: 'zmierzone przez stacje IPMA', ru: 'по станциям IPMA' },
   sea: { uk: 'Море', en: 'Sea', pt: 'Mar', es: 'Mar', fr: 'Mer', it: 'Mare', de: 'Meer', nl: 'Zee', cs: 'Moře', pl: 'Morze', ru: 'Море' },
   waves: { uk: 'Хвилі', en: 'Waves', pt: 'Ondas', es: 'Olas', fr: 'Vagues', it: 'Onde', de: 'Wellen', nl: 'Golven', cs: 'Vlny', pl: 'Fale', ru: 'Волны' },
   water: { uk: 'Вода', en: 'Water', pt: 'Água', es: 'Agua', fr: 'Eau', it: 'Acqua', de: 'Wasser', nl: 'Water', cs: 'Voda', pl: 'Woda', ru: 'Вода' },
@@ -618,7 +632,7 @@ const WORDS = {
   until: { uk: 'до', en: 'until', pt: 'até', es: 'hasta', fr: 'jusqu’à', it: 'fino a', de: 'bis', nl: 'tot', cs: 'do', pl: 'do', ru: 'до' },
   from: { uk: 'з', en: 'from', pt: 'a partir de', es: 'desde', fr: 'à partir de', it: 'dalle', de: 'ab', nl: 'vanaf', cs: 'od', pl: 'od', ru: 'с' },
   height: { uk: 'висота {m} м', en: '{m} m up', pt: '{m} m de altitude', es: '{m} m de altitud', fr: 'altitude {m} m', it: 'quota {m} m', de: '{m} m hoch', nl: '{m} m hoog', cs: 'výška {m} m', pl: 'wys. {m} m', ru: 'высота {m} м' },
-  source: { uk: 'Прогноз: Open-Meteo (моделі ECMWF, DWD та інші, CC BY 4.0). Попередження: IPMA. Оновлено о {time}.', en: 'Forecast: Open-Meteo (ECMWF, DWD and other models, CC BY 4.0). Warnings: IPMA. Updated at {time}.', pt: 'Previsão: Open-Meteo (modelos ECMWF, DWD e outros, CC BY 4.0). Avisos: IPMA. Atualizado às {time}.', es: 'Previsión: Open-Meteo (modelos ECMWF, DWD y otros, CC BY 4.0). Avisos: IPMA. Actualizado a las {time}.', fr: 'Prévisions : Open-Meteo (modèles ECMWF, DWD et autres, CC BY 4.0). Alertes : IPMA. Mis à jour à {time}.', it: 'Previsioni: Open-Meteo (modelli ECMWF, DWD e altri, CC BY 4.0). Allerte: IPMA. Aggiornato alle {time}.', de: 'Vorhersage: Open-Meteo (Modelle von ECMWF, DWD u. a., CC BY 4.0). Warnungen: IPMA. Stand {time}.', nl: 'Verwachting: Open-Meteo (ECMWF, DWD en andere modellen, CC BY 4.0). Waarschuwingen: IPMA. Bijgewerkt om {time}.', cs: 'Předpověď: Open-Meteo (modely ECMWF, DWD a další, CC BY 4.0). Výstrahy: IPMA. Aktualizováno v {time}.', pl: 'Prognoza: Open-Meteo (modele ECMWF, DWD i inne, CC BY 4.0). Ostrzeżenia: IPMA. Aktualizacja {time}.', ru: 'Прогноз: Open-Meteo (модели ECMWF, DWD и другие, CC BY 4.0). Предупреждения: IPMA. Обновлено в {time}.' },
+  source: { uk: 'Прогноз: Open-Meteo (моделі ECMWF, DWD та інші, CC BY 4.0). Температура зараз і попередження: IPMA. Оновлено о {time}.', en: 'Forecast: Open-Meteo (ECMWF, DWD and other models, CC BY 4.0). Temperature now and warnings: IPMA. Updated at {time}.', pt: 'Previsão: Open-Meteo (modelos ECMWF, DWD e outros, CC BY 4.0). Avisos: IPMA. Atualizado às {time}.', es: 'Previsión: Open-Meteo (modelos ECMWF, DWD y otros, CC BY 4.0). Avisos: IPMA. Actualizado a las {time}.', fr: 'Prévisions : Open-Meteo (modèles ECMWF, DWD et autres, CC BY 4.0). Alertes : IPMA. Mis à jour à {time}.', it: 'Previsioni: Open-Meteo (modelli ECMWF, DWD e altri, CC BY 4.0). Allerte: IPMA. Aggiornato alle {time}.', de: 'Vorhersage: Open-Meteo (Modelle von ECMWF, DWD u. a., CC BY 4.0). Warnungen: IPMA. Stand {time}.', nl: 'Verwachting: Open-Meteo (ECMWF, DWD en andere modellen, CC BY 4.0). Waarschuwingen: IPMA. Bijgewerkt om {time}.', cs: 'Předpověď: Open-Meteo (modely ECMWF, DWD a další, CC BY 4.0). Výstrahy: IPMA. Aktualizováno v {time}.', pl: 'Prognoza: Open-Meteo (modele ECMWF, DWD i inne, CC BY 4.0). Ostrzeżenia: IPMA. Aktualizacja {time}.', ru: 'Прогноз: Open-Meteo (модели ECMWF, DWD и другие, CC BY 4.0). Предупреждения: IPMA. Обновлено в {time}.' },
   offline: { uk: 'Немає зв’язку — показано останній прогноз', en: 'Offline — showing the last forecast', pt: 'Sem ligação — última previsão', es: 'Sin conexión — última previsión', fr: 'Hors ligne — dernières prévisions', it: 'Offline — ultime previsioni', de: 'Offline — letzte Vorhersage', nl: 'Offline — de laatste verwachting', cs: 'Offline — poslední předpověď', pl: 'Offline — ostatnia prognoza', ru: 'Нет связи — последний прогноз' },
   none: { uk: 'Прогноз зараз недоступний. Спробуйте пізніше.', en: 'The forecast is not available now. Try again later.', pt: 'A previsão não está disponível. Tente mais tarde.', es: 'La previsión no está disponible. Inténtelo más tarde.', fr: 'Prévisions indisponibles. Réessayez plus tard.', it: 'Previsioni non disponibili. Riprova più tardi.', de: 'Vorhersage gerade nicht verfügbar. Später erneut versuchen.', nl: 'De verwachting is nu niet beschikbaar. Probeer het later opnieuw.', cs: 'Předpověď teď není k dispozici. Zkuste to později.', pl: 'Prognoza jest teraz niedostępna. Spróbuj później.', ru: 'Прогноз сейчас недоступен. Попробуйте позже.' },
   loading: { uk: 'Завантажую прогноз…', en: 'Loading the forecast…', pt: 'A carregar a previsão…', es: 'Cargando la previsión…', fr: 'Chargement des prévisions…', it: 'Caricamento delle previsioni…', de: 'Vorhersage wird geladen…', nl: 'Verwachting laden…', cs: 'Načítám předpověď…', pl: 'Wczytuję prognozę…', ru: 'Загружаю прогноз…' },
