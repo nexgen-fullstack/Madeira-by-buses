@@ -1,6 +1,5 @@
 import type {
   ExpressionSpecification,
-  FilterSpecification,
   LayerSpecification,
   SourceSpecification,
   StyleSpecification,
@@ -207,88 +206,52 @@ export const SATELLITE_CLOSE_PAINT = {
 } as const;
 
 /**
- * The sea of a resort: the deep teal of the open ocean round the island rather than the
- * near-black of the imagery, and (see `resortShallows`) bright clear turquoise along the
- * shore, as the sea is by a resort's beach. Laid over the imagery along the coastline of
- * the vector tiles, a little lighter close in, where the surf and the boats show through.
+ * The sea round the island: the deep teal of the open ocean rather than the near-black of
+ * the imagery, lightening by the shore to a muted turquoise (Madeira's shores are rock and
+ * pebbles, not white sand). Painted in bands by distance from the coast (public/coast.json,
+ * scripts/coast-line.py), opaque enough out at sea that the seams between the imagery's
+ * pictures do not show, clearer near the shore, where the surf and the rocks show through.
  */
 export const RESORT_SEA = '#126e89';
-/** The shallows along the shore: clear turquoise. */
-export const RESORT_SHALLOWS = '#3fd6d2';
-/** The sea before its tiles come, and wherever there are none. */
+/** The sea before its bands come, and wherever there are none. */
 const RESORT_SEA_DEEP = '#126e89';
 /** The sea of the plain map, a lighter turquoise. */
 const RESORT_SEA_MAP = '#8fdbe3';
 
-/** The shallows' band along the coast, and how far out from the shore its middle is (m). */
-const SHALLOWS_WIDE = 170;
-/** A width in metres as pixels at each zoom (at Madeira's latitude), for a line's paint. */
-const metres = (m: number): ExpressionSpecification => [
-  'interpolate',
-  ['exponential', 2],
-  ['zoom'],
-  8,
-  (m * 2 ** 8) / 131_900,
-  20,
-  (m * 2 ** 20) / 131_900,
-];
-
 /**
- * The turquoise shallows: a soft band along the coastline (public/coast.json, from
- * OpenStreetMap by scripts/coast-line.py), on the sea's side of it (OpenStreetMap draws
- * a coast with the land on its left), fading out to the deep teal.
+ * The sea's colour and opacity by how far out a band ends (m; 9999: the open sea): from a
+ * muted turquoise by the rocks to the deep teal, in small steps that read as one fade.
  */
-function resortShallows(): LayerSpecification[] {
-  return [
-    {
-      id: 'mb-shallows',
-      type: 'line',
-      source: 'mb-coast',
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: {
-        'line-color': RESORT_SHALLOWS,
-        'line-width': metres(SHALLOWS_WIDE),
-        // Out to sea a little only: a big offset turns every bend of the shore into a spike.
-        'line-offset': metres(SHALLOWS_WIDE * 0.28),
-        'line-blur': metres(SHALLOWS_WIDE),
-        'line-opacity': ['interpolate', ['linear'], ['zoom'], 9, 0.75, 13, 0.7, 17, 0.55],
-      },
-    } as LayerSpecification,
-  ];
-}
-
-/** Water that is sea, a lake, a reservoir or a pool — not a river bed (dry most of the year). */
-const STANDING_WATER: FilterSpecification = [
-  'all',
-  ['!=', ['get', 'brunnel'], 'tunnel'],
-  ['!=', ['get', 'class'], 'river'],
+const SEA_FADE: [number, string, number][] = [
+  [20, '#2a98a1', 0.46],
+  [45, '#26919d', 0.55],
+  [75, '#228a99', 0.63],
+  [110, '#1e8395', 0.71],
+  [155, '#1a7c91', 0.78],
+  [210, '#16768d', 0.84],
+  [280, '#14718b', 0.89],
+  [9999, RESORT_SEA, 0.93],
 ];
 
-function resortSea(source: string): LayerSpecification {
+function resortSea(): LayerSpecification {
+  const by = (i: 1 | 2): ExpressionSpecification =>
+    [
+      'match',
+      ['get', 'd'],
+      ...SEA_FADE.flatMap((b) => [b[0], b[i]]),
+      SEA_FADE.at(-1)![i],
+    ] as unknown as ExpressionSpecification;
   return {
     id: 'mb-resort-sea',
     type: 'fill',
-    source,
-    'source-layer': 'water',
-    filter: STANDING_WATER,
+    source: 'mb-coast',
     paint: {
-      'fill-color': RESORT_SEA,
-      'fill-antialias': false,
-      'fill-opacity': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        6,
-        0.92,
-        11,
-        0.88,
-        14,
-        0.78,
-        16,
-        0.6,
-        18,
-        0.4,
-      ],
+      'fill-color': by(1),
+      // Edges smoothed, so the bands meet without a seam.
+      'fill-antialias': true,
+      'fill-outline-color': 'rgba(0, 0, 0, 0)',
+      // Close in a little clearer still: the surf, the boats, the harbour walls.
+      'fill-opacity': ['interpolate', ['linear'], ['zoom'], 15, by(2), 18, ['*', 0.8, by(2)]],
     },
   } as LayerSpecification;
 }
@@ -401,9 +364,7 @@ export function overlayVector(
   const keepLines = new Set(['transportation', 'boundary', 'aeroway']);
   const water = vector.layers.find((l) => l.type === 'fill' && sourceLayer(l) === 'water');
   const kept: LayerSpecification[] =
-    base === 'satellite' && water && 'source' in water
-      ? [resortSea(water.source), ...resortShallows()]
-      : [];
+    base === 'satellite' && water && 'source' in water ? [resortSea()] : [];
   for (const layer of vector.layers) {
     if (layer.type === 'symbol' || layer.type === 'fill-extrusion') {
       kept.push(base === 'satellite' && layer.type === 'symbol' ? brightText(layer) : layer);

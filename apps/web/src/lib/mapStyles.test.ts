@@ -82,7 +82,6 @@ describe('map styles', () => {
       'mb-satellite',
       'mb-satellite-close',
       'mb-resort-sea',
-      'mb-shallows',
       'road',
       'building-3d',
       'poi',
@@ -120,8 +119,9 @@ describe('map styles', () => {
 
   it('lays a turquoise resort sea over the imagery, along the coastline, and on the plain map', () => {
     const sea = overlayVector(VECTOR, 'satellite').layers.find((l) => l.id === 'mb-resort-sea')!;
-    expect(sea).toMatchObject({ type: 'fill', source: 'openmaptiles', 'source-layer': 'water' });
-    expect(sea.type === 'fill' && sea.paint?.['fill-color']).toBe(RESORT_SEA);
+    // In bands by distance from the shore, the open sea the deepest.
+    expect(sea).toMatchObject({ type: 'fill', source: 'mb-coast' });
+    expect(JSON.stringify(sea.type === 'fill' && sea.paint?.['fill-color'])).toContain(RESORT_SEA);
     // Not over the relief map, which has a sea of its own.
     expect(ids(overlayVector(VECTOR, 'relief'))).not.toContain('mb-resort-sea');
     const plain = withResortWater(VECTOR).layers.find((l) => l.id === 'water')!;

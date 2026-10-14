@@ -1990,20 +1990,26 @@ export default function MapView({ className }: { className?: string }) {
       covered();
       map.resize();
       // A route fitted while the map was another size (still loading, a sheet opening) stays in view.
-      const { bounds, moved } = fitted.current;
-      if (bounds && !moved && !pickRef.current) fitTo(map, bounds, 0);
+      const { bounds, moved, key } = fitted.current;
+      if (bounds && !moved && !pickRef.current) fitTo(map, bounds, 0, key === 'island');
     });
     ro.observe(container.current);
     // The sheet over the map on a phone came to rest at another height.
     const onInset = () => {
-      const { bounds, moved } = fitted.current;
-      if (bounds && !moved && !pickRef.current) fitTo(map, bounds, 300);
+      const { bounds, moved, key } = fitted.current;
+      if (bounds && !moved && !pickRef.current) fitTo(map, bounds, 300, key === 'island');
     };
     window.addEventListener('mb-map-inset', onInset);
     window.addEventListener('mb-map-inset', covered);
+    // At launch the screen is still being laid out (the launch picture, the sheet settling)
+    // while the island is first fitted: fitted again once the map has drawn, and once more
+    // a moment later, so it opens large in the middle of the screen.
+    map.once('idle', onInset);
+    const settled = window.setTimeout(onInset, 1500);
     return () => {
       window.removeEventListener('mb-map-inset', onInset);
       window.removeEventListener('mb-map-inset', covered);
+      window.clearTimeout(settled);
       sheet.disconnect();
       ro.disconnect();
       map.remove();
@@ -2828,7 +2834,7 @@ interface Fit {
   moved?: boolean;
 }
 
-function fitTo(map: MapLibreMap, bounds: LngLatBounds, duration: number) {
+function fitTo(map: MapLibreMap, bounds: LngLatBounds, duration: number, island = false) {
   // Clear of the buttons down the right side, of the pin's height at the top and, on a
   // phone, of the sheet over the map's bottom.
   const sheet = parseFloat(
@@ -2846,8 +2852,9 @@ function fitTo(map: MapLibreMap, bounds: LngLatBounds, duration: number) {
     padding: {
       top,
       bottom: Math.min(bottom, Math.max(40, room - top - 80)),
-      left: 40,
-      right: 64,
+      // The whole island as large as it fits, a little clear of the edges.
+      left: island ? 14 : 40,
+      right: island ? 14 : 64,
     },
     maxZoom: 15.5,
     duration,
@@ -2872,6 +2879,6 @@ function apply(map: MapLibreMap, content: MapContent, fit: { current: Fit }) {
     const bounds = new LngLatBounds();
     for (const c of content.fit) bounds.extend([c.lon, c.lat]);
     fit.current = { key: content.fitKey, bounds };
-    fitTo(map, bounds, 600);
+    fitTo(map, bounds, 600, content.fitKey === 'island');
   }
 }
