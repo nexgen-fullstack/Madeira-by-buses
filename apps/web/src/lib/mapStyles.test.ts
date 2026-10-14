@@ -12,7 +12,6 @@ import {
   withHouseNumbers,
   withoutClutter,
   withResortWater,
-  RESORT_SEA,
   throughCache,
 } from './mapStyles.ts';
 
@@ -86,7 +85,6 @@ describe('map styles', () => {
       'mb-satellite-far',
       'mb-satellite',
       'mb-satellite-close',
-      'mb-resort-sea',
       'road',
       'building-3d',
       'poi',
@@ -125,13 +123,14 @@ describe('map styles', () => {
     expect(ids(overlayVector(style, 'satellite'))).toContain('mb-housenumber');
   });
 
-  it('lays a turquoise resort sea over the imagery, along the coastline, and on the plain map', () => {
-    const sea = overlayVector(VECTOR, 'satellite').layers.find((l) => l.id === 'mb-resort-sea')!;
-    // In bands by distance from the shore, the open sea the deepest.
-    expect(sea).toMatchObject({ type: 'fill', source: 'mb-coast' });
-    expect(JSON.stringify(sea.type === 'fill' && sea.paint?.['fill-color'])).toContain(RESORT_SEA);
-    // Not over the relief map, which has a sea of its own.
-    expect(ids(overlayVector(VECTOR, 'relief'))).not.toContain('mb-resort-sea');
+  it('leaves the imagery its own sea, and gives the plain map a turquoise one', () => {
+    // No sea painted over the photograph: it never sat right on the coast.
+    for (const style of [overlayVector(VECTOR, 'satellite'), fallbackStyle('satellite')]) {
+      expect(style.layers.some((l) => l.type === 'fill' && l.id !== 'building')).toBe(false);
+      for (const l of style.layers)
+        if (l.type === 'raster' && l.id === 'mb-satellite')
+          expect(l.paint).not.toHaveProperty('raster-saturation');
+    }
     const plain = withResortWater(VECTOR).layers.find((l) => l.id === 'water')!;
     expect(plain.type === 'fill' && plain.paint?.['fill-color']).toMatch(/^#[0-9a-f]{6}$/);
     expect(plain.type === 'fill' && plain.paint?.['fill-color']).not.toBe('rgb(158,189,255)');
@@ -140,10 +139,6 @@ describe('map styles', () => {
   it('falls back to tile-free styles', () => {
     expect(ids(fallbackStyle('map'))).toContain('mb-relief');
     expect(ids(fallbackStyle('satellite'))).toContain('mb-satellite');
-    // Its sea in the bands, the app's own, at every zoom.
-    const sea = fallbackStyle('satellite').layers.find((l) => l.id === 'mb-resort-sea');
-    expect(sea).toMatchObject({ type: 'fill', source: 'mb-coast' });
-    expect(sea).not.toHaveProperty('minzoom');
   });
 
   it('lays the islands drawn from their heights under the imagery, built into the app', () => {
