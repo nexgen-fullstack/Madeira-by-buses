@@ -23,6 +23,13 @@ export interface PoiExtra {
   b?: 1;
   /** Known only to Overture. */
   o?: 1;
+  /** Its Wikidata item, its photo on Wikimedia Commons (see wikidata.ts). */
+  wd?: string;
+  i?: string;
+  /** Its Wikipedia articles by language, the year it was built, its heritage entry. */
+  wp?: Record<string, string>;
+  y?: number;
+  s?: string;
 }
 
 /** `[category, name, lat, lon, extra?]`, as the app reads it. */

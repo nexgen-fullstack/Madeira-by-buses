@@ -10,7 +10,7 @@ import { load, save } from './storage.ts';
  */
 
 /**
- * Where the published timetable is, e.g. https://…github.io/Madeira-by-busses/data/network.json,
+ * Where the published timetable is, e.g. https://…github.io/Madeira-by-buses/data/network.json,
  * and other copies of it to try when that one is unreachable (space-separated).
  */
 const REMOTES: string[] = (import.meta.env.VITE_REMOTE_DATA ?? '').split(/\s+/).filter(Boolean);

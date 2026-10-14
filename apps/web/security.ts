@@ -42,8 +42,8 @@ export function contentSecurity(): Plugin {
           `script-src 'self' ${hashes.join(' ')}`.trim(),
           // React and the map set styles on elements.
           "style-src 'self' 'unsafe-inline'",
-          `img-src 'self' data: blob: https://i.ytimg.com ${MAP_SERVERS} ${others.join(' ')}`.trim(),
-          `connect-src 'self' data: blob: ${MAP_SERVERS} ${DATA_SERVERS} ${others.join(' ')}`.trim(),
+          `img-src 'self' data: blob: https://i.ytimg.com ${MAP_SERVERS} ${PHOTO_SERVERS} ${others.join(' ')}`.trim(),
+          `connect-src 'self' data: blob: ${MAP_SERVERS} ${DATA_SERVERS} ${WIKI_SERVERS} ${others.join(' ')}`.trim(),
           "font-src 'self' data:",
           // The webcams' live broadcasts.
           'frame-src https://www.youtube-nocookie.com https://www.youtube.com',
@@ -74,6 +74,12 @@ const MAP_SERVERS = [
   'https://server.arcgisonline.com',
   'https://s3.amazonaws.com',
 ].join(' ');
+
+/** The photos of places on the map's cards (Wikimedia Commons). */
+const PHOTO_SERVERS = ['https://upload.wikimedia.org', 'https://thumb.wikimedia.org'].join(' ');
+
+/** What the cards ask of the places: their photos (Commons) and articles (Wikipedia). */
+const WIKI_SERVERS = ['https://commons.wikimedia.org', 'https://*.wikipedia.org'].join(' ');
 
 /** The weather (Open-Meteo, IPMA) and the website itself (webcams, timetables for the app). */
 const DATA_SERVERS = [

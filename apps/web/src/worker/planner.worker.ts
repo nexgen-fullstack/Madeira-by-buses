@@ -151,13 +151,12 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
 const DRIVING = 7;
 
 /**
- * Where the phone is on the ways rather than in the houses: on foot on the nearest
- * pavement, footway or path (the side of the road the fix is on), at speed on the nearest
- * road; as far as the fix may be off (its accuracy), within reason. Null: nothing so near.
+ * Where the phone is, at speed (in a bus, a car), on the nearest road, as far as the fix may
+ * be off (its accuracy), within reason. On foot, null: the person is where the phone says,
+ * in a pedestrian street, a square, a church or a shop, not put onto the nearest pavement.
  */
 function snap(p: LatLon, accuracy: number, speed: number): LatLon | null {
-  // A fix in a block of houses is often 20–40 m from the street it was taken on.
+  if (speed <= DRIVING || !roads) return null;
   const max = Math.max(35, Math.min(accuracy * 2.5, 60));
-  if (speed > DRIVING && roads) return roads.snap(p, max)?.point ?? null;
-  return walkGraph?.onPavement(p, max)?.point ?? null;
+  return roads.snap(p, max)?.point ?? null;
 }

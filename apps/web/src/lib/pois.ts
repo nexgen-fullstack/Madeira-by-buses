@@ -97,7 +97,23 @@ export interface Poi {
   web?: string;
   /** A big supermarket (Continente, Pingo Doce): drawn larger, in its own colour, named. */
   big?: boolean;
+  /** Its Wikidata item, and its photo's file name on Wikimedia Commons. */
+  wikidata?: string;
+  photo?: string;
+  /** Its Wikipedia articles by language (a church's history), the year it was built. */
+  articles?: Record<string, string>;
+  built?: number;
+  /** Its entry in Portugal's heritage register (SIPA). */
+  sipa?: string;
 }
+
+/**
+ * The churches' gold: their dots shine on the map (a neon glow round a gold disc), so a church
+ * is found at a glance among the grey and coloured dots of shops and cafés.
+ */
+export const CHURCH_GOLD = '#FFC400';
+/** Their names, in a gold dark enough to read on the white halo. */
+export const CHURCH_NAME_GOLD = '#A66F00';
 
 /** The big supermarkets' own colours, for their dots. */
 export const BIG_STORE_COLOR = { continente: '#E30613', pingo: '#2E8B3A' } as const;
@@ -162,7 +178,7 @@ export const POI_LOOK: Record<PoiCategory, { icon: LucideIcon; color: string }> 
   attraction: { icon: Castle, color: '#0F8C7E' },
   museum: { icon: Landmark, color: '#0F8C7E' },
   culture: { icon: Drama, color: '#0F8C7E' },
-  church: { icon: Church, color: '#6D6F73' },
+  church: { icon: Church, color: CHURCH_GOLD },
   gym: { icon: Dumbbell, color: '#188038' },
   tour: { icon: Compass, color: '#0F8C7E' },
   library: { icon: Library, color: '#188038' },
@@ -255,6 +271,7 @@ export function poiRank(p: Poi): number {
     case 'museum':
     case 'hospital':
     case 'mall':
+    case 'church':
       return 1;
     case 'restaurant':
     case 'cafe':
@@ -262,7 +279,6 @@ export function poiRank(p: Poi): number {
     case 'hotel':
     case 'grocery':
     case 'pharmacy':
-    case 'church':
     case 'culture':
       return 2;
     case 'parking':
@@ -281,7 +297,18 @@ type Row = [
   string,
   number,
   number,
-  { k?: string; h?: string; p?: string; w?: string; b?: 1 }?,
+  {
+    k?: string;
+    h?: string;
+    p?: string;
+    w?: string;
+    b?: 1;
+    wd?: string;
+    i?: string;
+    wp?: Record<string, string>;
+    y?: number;
+    s?: string;
+  }?,
 ];
 
 let loading: Promise<Poi[]> | undefined;
@@ -303,6 +330,11 @@ export function loadPois(): Promise<Poi[]> {
         phone: x?.p,
         web: x?.w,
         ...(x?.b ? { big: true } : {}),
+        ...(x?.wd ? { wikidata: x.wd } : {}),
+        ...(x?.i ? { photo: x.i } : {}),
+        ...(x?.wp ? { articles: x.wp } : {}),
+        ...(x?.y ? { built: x.y } : {}),
+        ...(x?.s ? { sipa: x.s } : {}),
       }));
     } catch {
       loading = undefined;

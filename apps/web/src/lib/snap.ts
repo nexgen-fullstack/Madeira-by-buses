@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { haversine, type LatLon } from '@madeirabus/engine';
 import type { PlannerClient } from '../worker/client.ts';
 
@@ -11,16 +11,17 @@ export interface Fix extends LatLon {
 }
 
 /**
- * Puts the phone's GPS fixes on the ways (`PlannerClient.snap`): walking, on the pavement
- * on the side of the road the fix is on, on a footway or a path, never in a house; going
- * faster than a walker can, on the road. Its speed from the phone, or from the last two fixes.
+ * Puts the phone's GPS fixes where the person is (`PlannerClient.snap`): walking, just where
+ * the phone says — on a pedestrian street, in a square, inside a church — never moved onto
+ * the nearest pavement; going faster than a walker can (a bus, a car), on the road. Its speed
+ * from the phone, or from the last two fixes.
  */
 export class Snapper {
   private last?: { p: LatLon; time: number };
 
   constructor(private readonly planner: PlannerClient) {}
 
-  /** The fix on the ways, or as it came when none is near or the streets are not loaded. */
+  /** The fix on the road at speed; else, or with no road near or loaded, as it came. */
   async place(fix: Fix): Promise<LatLon> {
     const time = fix.timestamp ?? Date.now();
     let speed = fix.speed ?? undefined;
@@ -37,7 +38,7 @@ export class Snapper {
   }
 }
 
-/** `fix` on the ways (see `Snapper`); as it is until the first answer. */
+/** `fix` where the person is (see `Snapper`); as it is until the first answer. */
 export function useSnapped<T extends Fix>(
   fix: T | undefined,
   planner: PlannerClient | undefined,
@@ -53,8 +54,11 @@ export function useSnapped<T extends Fix>(
       cancelled = true;
     };
   }, [fix]);
-  if (!fix) return undefined;
-  // The last fix placed (a few milliseconds behind the newest), not a jump into the houses
-  // and back while the next answer comes.
-  return placed ? { ...placed.of, lat: placed.at.lat, lon: placed.at.lon } : fix;
+  // The last fix placed (a few milliseconds behind the newest), not a jump off the road and
+  // back while the next answer comes.
+  return useMemo(
+    () =>
+      !fix ? undefined : placed ? { ...placed.of, lat: placed.at.lat, lon: placed.at.lon } : fix,
+    [fix, placed],
+  );
 }

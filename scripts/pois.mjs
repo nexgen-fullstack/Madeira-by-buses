@@ -137,12 +137,33 @@ function categoryOf(tags) {
 /** Places nobody may use: private car parks and toilets, a hotel's own. */
 const closed = (tags) => ['private', 'no', 'customers'].includes(tags.access);
 
+/**
+ * A photo's file name on Wikimedia Commons ("Sé do Funchal.jpg") from an `image` or
+ * `wikimedia_commons` tag ("File:…", a Commons page or upload address); undefined for a
+ * category, a gallery or a picture anywhere else (the app shows Commons' pictures only).
+ */
+export function commonsFile(value) {
+  if (!value) return undefined;
+  const v = value.split(';')[0].trim();
+  let m = /^(?:File|Image):(.+\.(?:jpe?g|png|webp|tiff?))$/i.exec(v);
+  if (m) return m[1].replace(/_/g, ' ');
+  m = /^https?:\/\/commons\.(?:m\.)?wikimedia\.org\/wiki\/(?:File|Image):(.+)$/i.exec(v);
+  if (m) return decodeURIComponent(m[1]).replace(/_/g, ' ');
+  m =
+    /^https?:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/]+)/i.exec(
+      v,
+    );
+  if (m) return decodeURIComponent(m[1]).replace(/_/g, ' ');
+  return undefined;
+}
+
 /** Of the information points, the tourist offices only: not every board and signpost. */
 const office = (tags) => ['office', 'visitor_centre'].includes(tags.information);
 
 /**
  * The places, small: `[category, name, lat, lon, extra?]` where `extra` holds the opening
- * hours (`h`), phone (`p`), website (`w`) and kind (`k`, the OSM value, e.g. "pastry") when known.
+ * hours (`h`), phone (`p`), website (`w`), kind (`k`, the OSM value, e.g. "pastry"), Wikidata
+ * item (`wd`) and Commons photo (`i`) when known.
  * Unnamed places stay only where a name does not matter (toilets, water, cash machines, car
  * parks, taxis, charging, beaches).
  */
@@ -171,6 +192,10 @@ export function compactPois(elements) {
     if (phone) extra.p = phone;
     const web = tags.website ?? tags['contact:website'];
     if (web) extra.w = web;
+    // Its Wikidata item and its photo on Wikimedia Commons: the card's photo and history.
+    if (/^Q\d+$/.test(tags.wikidata ?? '')) extra.wd = tags.wikidata;
+    const photo = commonsFile(tags.wikimedia_commons) ?? commonsFile(tags.image);
+    if (photo) extra.i = photo;
     const row = [category, name, Math.round(lat * 1e5) / 1e5, Math.round(lon * 1e5) / 1e5];
     out.push(Object.keys(extra).length ? [...row, extra] : row);
   }
@@ -187,7 +212,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
       'user-agent':
-        'MadeiraBus places collector (+https://github.com/nexgen-fullstack/Madeira-by-busses)',
+        'MadeiraBus places collector (+https://github.com/nexgen-fullstack/Madeira-by-buses)',
     },
     body: `data=${encodeURIComponent(poiQuery(bbox))}`,
   });

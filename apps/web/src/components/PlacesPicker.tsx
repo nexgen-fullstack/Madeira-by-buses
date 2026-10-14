@@ -105,16 +105,21 @@ const DOT = 44;
  */
 export async function poiImage(category: PoiCategory): Promise<ImageData | undefined> {
   const { icon: Icon, color } = POI_LOOK[category];
+  const church = category === 'church';
   // Out of whatever React is rendering now (an effect asks for it).
   await new Promise((resolve) => setTimeout(resolve, 0));
   const holder = document.createElement('div');
   const root = createRoot(holder);
-  flushSync(() => root.render(<Icon size={24} color="#ffffff" strokeWidth={2.4} />));
+  // A church's icon dark on its gold, the others white on their colour.
+  flushSync(() =>
+    root.render(<Icon size={24} color={church ? '#4A2C00' : '#ffffff'} strokeWidth={2.4} />),
+  );
   const svg = holder.innerHTML;
   setTimeout(() => root.unmount(), 0);
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
+      if (church) return resolve(churchImage(img));
       const canvas = document.createElement('canvas');
       canvas.width = DOT;
       canvas.height = DOT;
@@ -135,6 +140,44 @@ export async function poiImage(category: PoiCategory): Promise<ImageData | undef
     img.onerror = () => resolve(undefined);
     img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   });
+}
+
+/** Image size of a church's dot with its glow (twice the size of the screen). */
+const GLOW = 64;
+
+/**
+ * A church's dot: bright gold, ringed in white, in a neon glow of gold, larger than a shop's,
+ * so it stands out among the other places as a landmark does.
+ */
+function churchImage(icon: HTMLImageElement): ImageData | undefined {
+  const canvas = document.createElement('canvas');
+  canvas.width = GLOW;
+  canvas.height = GLOW;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return undefined;
+  const c = GLOW / 2;
+  const r = DOT / 2 + 2;
+  const glow = ctx.createRadialGradient(c, c, r - 4, c, c, GLOW / 2);
+  glow.addColorStop(0, 'rgba(255, 214, 0, 0.85)');
+  glow.addColorStop(0.45, 'rgba(255, 196, 0, 0.4)');
+  glow.addColorStop(1, 'rgba(255, 196, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, GLOW, GLOW);
+  ctx.beginPath();
+  ctx.arc(c, c, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(c, c, r - 3, 0, Math.PI * 2);
+  const gold = ctx.createLinearGradient(c, c - r, c, c + r);
+  gold.addColorStop(0, '#FFE45C');
+  gold.addColorStop(0.55, POI_LOOK.church.color);
+  gold.addColorStop(1, '#F0A500');
+  ctx.fillStyle = gold;
+  ctx.fill();
+  const s = DOT * 0.52;
+  ctx.drawImage(icon, c - s / 2, c - s / 2, s, s);
+  return ctx.getImageData(0, 0, GLOW, GLOW);
 }
 
 /** A category's dot's image name on the map; a big supermarket's own. */

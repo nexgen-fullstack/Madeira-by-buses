@@ -1,14 +1,14 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 /**
- * Madeira by busses phone app: the website's build (apps/web, `--mode app`) inside a
+ * Madeira by buses phone app: the website's build (apps/web, `--mode app`) inside a
  * native shell, which adds GPS with the screen off, notifications and
  * reminders. Build: `pnpm --filter @madeirabus/mobile build`, then Android
  * Studio or `./gradlew assembleRelease` in android/.
  */
 const config: CapacitorConfig = {
   appId: 'io.github.nexgenfullstack.madeirabus',
-  appName: 'Madeira by busses',
+  appName: 'Madeira by buses',
   webDir: '../web/dist',
   // The splash screen's colour behind the page while it loads: no white flash before the logo.
   backgroundColor: '#0056C7',

@@ -31,8 +31,8 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['favicon-32.png', 'favicon-64.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Madeira by busses',
-        short_name: 'Madeira by busses',
+        name: 'Madeira by buses',
+        short_name: 'Madeira by buses',
         description:
           'Explore Madeira with ease: routes with transfers, fares, timetables and GPS get-off alerts for the Madeira buses.',
         lang: 'uk',

@@ -104,6 +104,18 @@ export function backToOrigin(kind: string): boolean {
   return true;
 }
 
+/**
+ * Leaves a screen for the one it was opened from, back through the history over its changes
+ * in place (the weather of other places looked at, a webcam played); to the planner when it
+ * was opened directly (a shared link).
+ */
+export function leaveScreen(): void {
+  const { depth, originDepth } = stepNow();
+  if (depth !== undefined && originDepth !== undefined && depth > originDepth)
+    history.go(originDepth - depth);
+  else navigate('plan');
+}
+
 /** The same screen another way (a trail walked from its end): no new step to go back through. */
 export function replaceRoute(path: string, query?: Record<string, string | undefined>): void {
   const state = history.state as object | null;

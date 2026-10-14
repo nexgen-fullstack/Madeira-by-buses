@@ -235,7 +235,7 @@ function draw(ctx: Ctx, sheet: LineSheet, width: number): number {
   ctx.font = font(12, true);
   ctx.fillStyle = NAVY;
   ctx.textAlign = 'right';
-  ctx.fillText('Madeira by busses', width - PAD, y + 12);
+  ctx.fillText('Madeira by buses', width - PAD, y + 12);
   return y + 24 + PAD;
 }
 

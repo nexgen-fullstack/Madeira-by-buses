@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ExternalLink, Mountain, Play, Video, X } from 'lucide-react';
 import { useMapContent } from '../components/mapContext.tsx';
 import { useI18n } from '../i18n.ts';
-import { useBack } from '../lib/back.ts';
 import type { MapContent } from '../lib/mapContent.ts';
-import { navigate, type Route } from '../lib/router.ts';
+import { backTo, navigate, type Route } from '../lib/router.ts';
 import {
   loadNetmadeiraKey,
   loadWebcamLive,
@@ -20,8 +20,10 @@ import { weatherWord } from '../lib/weather.ts';
 
 /**
  * Madeira's live webcams on the map and in a list, the mountains first (is Pico do Arieiro
- * above the clouds?): a tap plays the camera's broadcast here in YouTube's player, or opens
- * the provider's page when it has none on YouTube now.
+ * above the clouds?): a tap (in the list or on the map) plays the camera's broadcast at once
+ * in the middle of the screen, over the map and the list, in YouTube's player, or opens the
+ * provider's page when it has none on YouTube now. Closed ("back", ✕, beside it), the list
+ * and the island with its cameras are there as they were.
  */
 export function WebcamsView({ route }: { route: Route }) {
   const t = useI18n();
@@ -60,14 +62,15 @@ export function WebcamsView({ route }: { route: Route }) {
     if (inApp(c)) navigate('webcams', { c: c.id });
     else window.open(c.page, '_blank', 'noopener');
   };
-  // The phone's back button closes the player first.
-  useBack(
-    useCallback(() => {
-      if (!openId) return false;
-      navigate('webcams');
-      return true;
-    }, [openId]),
-  );
+  // Closed (✕, a tap beside it, Escape; the phone's back button, see App): back to the list
+  // and the map.
+  const close = useCallback(() => backTo('webcams'), []);
+  useEffect(() => {
+    if (!openId) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [openId, close]);
 
   const content = useMemo<MapContent>(
     () => ({
@@ -107,58 +110,73 @@ export function WebcamsView({ route }: { route: Route }) {
       <h2 className="weather__title">
         <Video size={20} aria-hidden /> {t.t('layers.webcams')}
       </h2>
-      {open && inApp(open) && (
-        <section className="webcam-player" aria-label={open.name}>
-          {live[open.id] ? (
-            <div className="webcam-player__frame">
-              <iframe
-                src={playerUrl(live[open.id]!.video)}
-                title={open.name}
-                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                allowFullScreen
-                referrerPolicy="strict-origin-when-cross-origin"
-              />
+      {/* Over the whole screen, in its middle: not inside the sheet the list is in. */}
+      {open &&
+        inApp(open) &&
+        createPortal(
+          <div
+            className="webcam-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={open.name}
+            // A tap beside the player closes it.
+            onClick={(e) => e.target === e.currentTarget && close()}
+          >
+            <div className="webcam-modal__box">
+              <section className="webcam-player" aria-label={open.name}>
+                {live[open.id] ? (
+                  <div className="webcam-player__frame">
+                    <iframe
+                      src={playerUrl(live[open.id]!.video)}
+                      title={open.name}
+                      allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                      allowFullScreen
+                      referrerPolicy="strict-origin-when-cross-origin"
+                    />
+                  </div>
+                ) : picture(open) ? (
+                  <div className="webcam-player__frame">
+                    <img src={picture(open)} alt={open.name} />
+                  </div>
+                ) : (
+                  <div className="webcam-player__frame webcam-player__frame--page">
+                    <iframe src={open.page} title={open.name} />
+                  </div>
+                )}
+                <div className="webcam-player__bar">
+                  <div>
+                    <div className="strong">{open.name}</div>
+                    <div className="muted small">
+                      {providerName(open)} · {live[open.id] ? 'YouTube' : 'netmadeira.com'}
+                    </div>
+                  </div>
+                  <a
+                    className="icon-button"
+                    href={
+                      live[open.id]
+                        ? `https://www.youtube.com/watch?v=${live[open.id]!.video}`
+                        : open.page
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="YouTube"
+                  >
+                    <ExternalLink size={18} />
+                  </a>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={t.t('close')}
+                    onClick={close}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </section>
             </div>
-          ) : picture(open) ? (
-            <div className="webcam-player__frame">
-              <img src={picture(open)} alt={open.name} />
-            </div>
-          ) : (
-            <div className="webcam-player__frame webcam-player__frame--page">
-              <iframe src={open.page} title={open.name} />
-            </div>
-          )}
-          <div className="webcam-player__bar">
-            <div>
-              <div className="strong">{open.name}</div>
-              <div className="muted small">
-                {providerName(open)} · {live[open.id] ? 'YouTube' : 'netmadeira.com'}
-              </div>
-            </div>
-            <a
-              className="icon-button"
-              href={
-                live[open.id]
-                  ? `https://www.youtube.com/watch?v=${live[open.id]!.video}`
-                  : open.page
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="YouTube"
-            >
-              <ExternalLink size={18} />
-            </a>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label={t.t('close')}
-              onClick={() => navigate('webcams')}
-            >
-              <X size={18} />
-            </button>
-          </div>
-        </section>
-      )}
+          </div>,
+          document.body,
+        )}
       <ul className="webcam-list">
         {sorted.map((c) => {
           const now = live[c.id];

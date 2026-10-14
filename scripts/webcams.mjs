@@ -16,7 +16,7 @@ const CHANNELS = {
   netmadeira: 'UCNtxVRy0Nv0U5weQ7PDbgAw',
   madeiraweb: 'UCH_lKz2VXlfLPgYOE3biySg',
 };
-const UA = 'MadeiraBus webcams (+https://github.com/nexgen-fullstack/Madeira-by-busses)';
+const UA = 'MadeiraBus webcams (+https://github.com/nexgen-fullstack/Madeira-by-buses)';
 
 /** Plain words: lower case, without accents or signs. */
 export const plain = (s) =>

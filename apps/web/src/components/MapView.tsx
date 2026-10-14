@@ -3,13 +3,11 @@ import {
   Bus,
   Camera,
   Check,
-  Clock,
+  ChevronLeft,
+  ChevronRight,
   CloudSun,
-  ExternalLink,
-  Flag,
   LayoutGrid,
   MapPin,
-  Phone,
   Signpost,
   Video,
   X,
@@ -67,7 +65,7 @@ import {
 } from '../lib/mapStyles.ts';
 import { pointName } from '../lib/pointName.ts';
 import { useBack } from '../lib/back.ts';
-import { navigate } from '../lib/router.ts';
+import { leaveScreen, navigate, useRoute } from '../lib/router.ts';
 import { trailPhotoSpots } from '../lib/photos.ts';
 import { loadTrails, trailLines, useTrails } from '../lib/trails.ts';
 import { useApp } from '../state/app.tsx';
@@ -84,6 +82,7 @@ import {
   poiImageId,
 } from './PlacesPicker.tsx';
 import {
+  CHURCH_NAME_GOLD,
   loadPois,
   ofCategory,
   POI_LOOK,
@@ -96,6 +95,7 @@ import type { LiveBus } from '../lib/liveBus.ts';
 import { useWarnings, useWeather } from '../lib/useWeather.ts';
 import { worstLevel } from '../lib/weather.ts';
 import { SkyIcon } from './SkyIcon.tsx';
+import { PlaceCard, type CardPlace } from './PlaceCard.tsx';
 
 // MapLibre computes its worker URL at runtime, which bundlers cannot see; point it at the bundled worker.
 setWorkerUrl(maplibreWorkerUrl);
@@ -692,7 +692,10 @@ async function addPoiImages(map: MapLibreMap, pois: readonly Poi[]) {
 const poiLook = (p: Poi) =>
   p.big
     ? { image: bigStoreImageId(p), color: '#202124' }
-    : { image: poiImageId(p.category), color: POI_LOOK[p.category].color };
+    : {
+        image: poiImageId(p.category),
+        color: p.category === 'church' ? CHURCH_NAME_GOLD : POI_LOOK[p.category].color,
+      };
 
 /** Puts the places of the kind chosen on the map, its dot drawn once. */
 async function applyPois(map: MapLibreMap, pois: readonly Poi[]) {
@@ -737,9 +740,18 @@ function addAllPoiLayers(map: MapLibreMap) {
       filter: ['==', ['get', 'rank'], rank],
       layout: {
         'icon-image': ['get', 'image'],
+        // A church's gold dot with its glow a little larger: a landmark.
         'icon-size': big
           ? ['interpolate', ['linear'], ['zoom'], 13, 0.55, 16, 0.8]
-          : ['interpolate', ['linear'], ['zoom'], minzoom, 0.5, 18, 0.72],
+          : [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              minzoom,
+              ['*', 0.5, ['coalesce', ['get', 'scale'], 1]],
+              18,
+              ['*', 0.72, ['coalesce', ['get', 'scale'], 1]],
+            ],
         'icon-padding': 1,
         'text-field':
           rank <= 1 ? ['get', 'name'] : ['step', ['zoom'], '', POI_NAMES_FROM, ['get', 'name']],
@@ -773,7 +785,13 @@ async function applyAllPois(map: MapLibreMap, pois: readonly Poi[] | undefined, 
       pois && on
         ? pois.map((p, i) => ({
             type: 'Feature',
-            properties: { i, name: p.name, rank: poiRank(p), ...poiLook(p) },
+            properties: {
+              i,
+              name: p.name,
+              rank: poiRank(p),
+              ...poiLook(p),
+              ...(p.category === 'church' ? { scale: 1.35 } : {}),
+            },
             geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
           }))
         : [],
@@ -1607,7 +1625,9 @@ export default function MapView({ className }: { className?: string }) {
   const shownStyle = useRef(`${layers.base}:fallback`);
   const [picked, setPicked] = useState<PickedPlace | undefined>();
   // A place's photo opened large.
-  const [bigPhoto, setBigPhoto] = useState<PlacePhoto | undefined>();
+  // Photos open large: those of a place's card, from the one tapped.
+  const [bigPhoto, setBigPhoto] = useState<{ list: PlacePhoto[]; at: number } | undefined>();
+  const shownPhoto = bigPhoto?.list[bigPhoto.at];
   // The "Places" button: its list of kinds open, the kind shown on the map, the places.
   const [placesOpen, setPlacesOpen] = useState(false);
   const [poiCategory, setPoiCategory] = useState<PoiCategory | undefined>();
@@ -1705,8 +1725,7 @@ export default function MapView({ className }: { className?: string }) {
     const locate = new GeolocateControl({
       positionOptions: { enableHighAccuracy: true },
       trackUserLocation: true,
-      // Its own dot stands where the GPS says, often in a house beside the street: ours
-      // stands on the pavement (on the road, going by bus), see `Snapper`.
+      // Ours stands where the GPS says on foot (on the road going by bus), see `Snapper`.
       showUserLocation: false,
       showAccuracyCircle: false,
     });
@@ -2112,6 +2131,13 @@ export default function MapView({ className }: { className?: string }) {
   const warnings = useWarnings();
   const warning = warnings ? worstLevel(warnings) : undefined;
   const funchal = forecasts?.[0]?.now;
+  // The weather and the webcams are screens a tap on their button opens and another closes.
+  const screen = useRoute().path[0];
+  const toggleScreen = (name: 'weather' | 'webcams') => {
+    if (screen !== name) navigate(name);
+    // Back to the screen it was opened from (its places looked at in between too).
+    else leaveScreen();
+  };
   // A run or a line tapped belongs to the map shown; another one, forget it.
   useEffect(() => {
     setNote(undefined);
@@ -2191,11 +2217,27 @@ export default function MapView({ className }: { className?: string }) {
   };
 
   const pickedLabel = picked?.name || t.t('place.pin');
-  // A viewpoint, a beach, a peak tapped: the view from there, when there is a photo of it.
-  const pickedPhoto = useMemo(
-    () => (picked && (picked.klass || picked.subclass) ? placePhoto(picked) : undefined),
-    [picked],
-  );
+  // The card of the place tapped: a viewpoint, a beach, a peak with the view from there when
+  // there is a photo of it; its photos, its view from above and its history in the card.
+  const cardPlace = useMemo<CardPlace | undefined>(() => {
+    if (!picked) return undefined;
+    const scenic =
+      picked.klass ||
+      picked.subclass ||
+      ['attraction', 'beach', 'park'].includes(picked.poi?.category ?? '');
+    const view = scenic ? placePhoto(picked) : undefined;
+    return {
+      name: pickedLabel,
+      kind: picked.poi
+        ? poiName(picked.poi.category, settings.lang)
+        : (poiLabel(settings.lang, picked.klass, picked.subclass) ??
+          `${picked.lat.toFixed(5)}, ${picked.lon.toFixed(5)}`),
+      lat: picked.lat,
+      lon: picked.lon,
+      ...(picked.poi ? { poi: picked.poi } : {}),
+      ...(view ? { view } : {}),
+    };
+  }, [picked, pickedLabel, settings.lang]);
   return (
     <div className={`${className ?? ''} map-wrap${pick ? ' map-wrap--picking' : ''}`}>
       <div ref={container} className="map-canvas" role="region" aria-label={t.t('map.label')} />
@@ -2299,13 +2341,15 @@ export default function MapView({ className }: { className?: string }) {
         >
           <Camera size={18} />
         </button>
-        {/* The weather on the island, with the colour of any official warning. */}
+        {/* The weather on the island, with the colour of any official warning: a tap shows
+            it, another takes it off again, back to the map as it was. */}
         <button
           type="button"
           className={`map-tool map-tool--weather${warning ? ` map-tool--warn-${warning}` : ''}`}
+          aria-pressed={screen === 'weather'}
           aria-label={t.t('layers.weather')}
           title={t.t('layers.weather')}
-          onClick={() => navigate('weather')}
+          onClick={() => toggleScreen('weather')}
         >
           {funchal ? (
             <span className="map-tool__weather" aria-hidden>
@@ -2316,13 +2360,14 @@ export default function MapView({ className }: { className?: string }) {
             <CloudSun size={18} />
           )}
         </button>
-        {/* The island's live webcams. */}
+        {/* The island's live webcams: on and off as the weather. */}
         <button
           type="button"
           className="map-tool"
+          aria-pressed={screen === 'webcams'}
           aria-label={t.t('layers.webcams')}
           title={t.t('layers.webcams')}
-          onClick={() => navigate('webcams')}
+          onClick={() => toggleScreen('webcams')}
         >
           <Video size={18} />
         </button>
@@ -2393,107 +2438,80 @@ export default function MapView({ className }: { className?: string }) {
           }}
         />
       )}
-      {picked && !pick && (
-        <div className="place-card" role="dialog" aria-label={pickedLabel}>
-          {pickedPhoto && (
-            <button
-              type="button"
-              className="place-card__photo"
-              aria-label={t.t('place.photo', { name: pickedPhoto.title })}
-              onClick={() => setBigPhoto(pickedPhoto)}
-            >
-              <img src={pickedPhoto.sm} alt="" width={480} height={320} />
-            </button>
-          )}
-          <div className="place-card__text">
-            <div className="strong">{pickedLabel}</div>
-            <div className="muted small">
-              {picked.poi
-                ? poiName(picked.poi.category, settings.lang)
-                : (poiLabel(settings.lang, picked.klass, picked.subclass) ??
-                  `${picked.lat.toFixed(5)}, ${picked.lon.toFixed(5)}`)}
-            </div>
-            {picked.poi?.hours && (
-              <div className="small place-card__line">
-                <Clock size={13} aria-hidden /> {picked.poi.hours}
-              </div>
-            )}
-            {(picked.poi?.phone || picked.poi?.web) && (
-              <div className="small place-card__line">
-                {picked.poi.phone && (
-                  <a href={`tel:${picked.poi.phone.split(/[;,]/)[0]!.replace(/\s/g, '')}`}>
-                    <Phone size={13} aria-hidden /> {picked.poi.phone.split(/[;,]/)[0]}
-                  </a>
-                )}
-                {picked.poi.web && (
-                  <a href={picked.poi.web} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink size={13} aria-hidden /> {t.t('places.website')}
-                  </a>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="place-card__actions">
-            <button
-              type="button"
-              className="button button--primary button--small"
-              onClick={() => {
-                planWith({ to: encodePlace({ ...picked, name: pickedLabel }) });
-                setPicked(undefined);
-              }}
-            >
-              <Flag size={14} /> {t.t('place.routeTo')}
-            </button>
-            <button
-              type="button"
-              className="button button--small"
-              onClick={() => {
-                planWith({ from: encodePlace({ ...picked, name: pickedLabel }) });
-                setPicked(undefined);
-              }}
-            >
-              <MapPin size={14} /> {t.t('place.routeFrom')}
-            </button>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label={t.t('close')}
-              onClick={() => setPicked(undefined)}
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
+      {picked && !pick && cardPlace && (
+        <PlaceCard
+          place={cardPlace}
+          onPhoto={(list, at) => setBigPhoto({ list, at })}
+          onAbove={() =>
+            mapRef.current?.easeTo({
+              center: [picked.lon, picked.lat],
+              zoom: Math.max(mapRef.current.getZoom(), 18.5),
+              duration: 700,
+            })
+          }
+          onRouteTo={() => {
+            planWith({ to: encodePlace({ ...picked, name: pickedLabel }) });
+            setPicked(undefined);
+          }}
+          onRouteFrom={() => {
+            planWith({ from: encodePlace({ ...picked, name: pickedLabel }) });
+            setPicked(undefined);
+          }}
+          onClose={() => setPicked(undefined)}
+        />
       )}
-      {bigPhoto && (
+      {shownPhoto && bigPhoto && (
         <div
           className="photo-view"
           role="dialog"
-          aria-label={bigPhoto.title}
+          aria-label={shownPhoto.title}
           onClick={() => setBigPhoto(undefined)}
         >
           <img
-            src={bigPhoto.lg}
-            alt={bigPhoto.title}
-            style={{ backgroundImage: `url("${bigPhoto.sm}")` }}
+            key={shownPhoto.lg}
+            src={shownPhoto.lg}
+            alt={shownPhoto.title}
+            style={{ backgroundImage: `url("${shownPhoto.sm}")` }}
           />
           <div className="photo-view__text">
-            <div className="strong">{bigPhoto.title}</div>
-            {bigPhoto.credit && (
+            <div className="strong">{shownPhoto.title}</div>
+            {shownPhoto.credit && (
               <a
                 className="small"
-                href={bigPhoto.credit.source}
+                href={shownPhoto.credit.source}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
               >
                 {t.t('scenic.photo', {
-                  author: bigPhoto.credit.author,
-                  license: bigPhoto.credit.license,
+                  author: shownPhoto.credit.author,
+                  license: shownPhoto.credit.license,
                 })}
               </a>
             )}
+            {bigPhoto.list.length > 1 && (
+              <div className="small photo-view__count">
+                {bigPhoto.at + 1} / {bigPhoto.list.length}
+              </div>
+            )}
           </div>
+          {/* Several photos: the one before and the one after, round. */}
+          {bigPhoto.list.length > 1 &&
+            ([-1, 1] as const).map((step) => (
+              <button
+                key={step}
+                type="button"
+                className={`icon-button photo-view__step photo-view__step--${step < 0 ? 'back' : 'next'}`}
+                aria-label={t.t(step < 0 ? 'place.photoBack' : 'place.photoNext')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const n = bigPhoto.list.length;
+                  setBigPhoto({ ...bigPhoto, at: (bigPhoto.at + step + n) % n });
+                }}
+              >
+                {step < 0 ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
+              </button>
+            ))}
           <button
             type="button"
             className="icon-button photo-view__close"

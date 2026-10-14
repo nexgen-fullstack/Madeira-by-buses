@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Builds every icon and store image of Madeira by busses from the logo.
+"""Builds every icon and store image of Madeira by buses from the logo.
 
 The logo (branding/logo.webp) is a picture on a rounded tile with a glowing
 rim, on a blue glow. The script finds the rim, cuts the tile out of the glow,
 models the glow as a smooth surface (to carry it past the picture's edges and
-behind the tile), lifts the lettering — "Madeira" with its pin, "by busses" —
+behind the tile), lifts the lettering — "Madeira" with its pin, "by buses" —
 off the picture, and lays them out again for each place an icon appears: the
 website and its home-screen icons, the Android launcher (adaptive and older),
 the Android splash screen, the app's header and the Google Play listing.
@@ -260,7 +260,7 @@ class Logo:
 
 
 def lettering(rgb: np.ndarray) -> np.ndarray:
-    """"Madeira" with its pin, and "by busses", lifted off the picture (RGBA, cropped)."""
+    """"Madeira" with its pin, and "by buses", lifted off the picture (RGBA, cropped)."""
     top, left = 640, 60
     rgb = rgb[top:1150, left:1200]
     R, G, B = rgb[..., 0], rgb[..., 1], rgb[..., 2]
@@ -281,7 +281,7 @@ def lettering(rgb: np.ndarray) -> np.ndarray:
         dtype=np.float64,
     ) / 255
     warm *= keep
-    # "by busses": light letters with plenty of red (the wave and the glow round
+    # "by buses": light letters with plenty of red (the wave and the glow round
     # the letters are cyan, with almost none).
     light = smoothstep(30, 90, R) * smoothstep(110, 180, (R + G + B) / 3)
     light *= (yy > 935) & (yy < 1140) & (xx > 200) & (xx < 1080)
@@ -407,7 +407,7 @@ def full_bleed(logo: Logo, canvas: int, scale: float = 1.0) -> tuple[np.ndarray,
     The launcher shows the middle 72 dp in its own shape (a squircle on Samsung, a
     circle on Pixel). The tile fills those 72 dp, its rim along their edge as a thin
     frame, so no frame of glow is left round a small tile: the bus and "Madeira by
-    busses" from edge to edge (the lettering still inside a circle). Behind it, the
+    buses" from edge to edge (the lettering still inside a circle). Behind it, the
     same picture larger and blurred, for the tile's rounded corners where a
     launcher's shape is squarer than they are. `scale`: the tile's size against the
     72 dp.

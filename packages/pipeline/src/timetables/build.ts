@@ -701,7 +701,7 @@ export function buildTimetableFeed(
     shapes: [],
     frequencies: [],
     feedInfo: {
-      feed_publisher_name: 'Madeira by busses, from the CAM and SIGA Rodoeste timetables',
+      feed_publisher_name: 'Madeira by buses, from the CAM and SIGA Rodoeste timetables',
     },
   };
   const lines: LineReport[] = [];

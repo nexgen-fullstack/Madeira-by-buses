@@ -46,6 +46,7 @@ import { RoadRouter } from './shapes.ts';
 import { checkShapes, offRoadMarkdown } from './checkShapes.ts';
 import { buildTrails, type OsmRelation } from './trails.ts';
 import { mergePois, type OvertureFile, type PoiRow } from './pois.ts';
+import { attachWikidata, type WikidataFile } from './wikidata.ts';
 import { placeStopsBySide, type OsmStopNode } from './stopSides.ts';
 import { AGENCIES, buildTimetableFeed } from './timetables/build.ts';
 import { loadLocalities, loadSiga, loadTimetables } from './timetables/load.ts';
@@ -66,6 +67,7 @@ const USAGE = `madeirabus-pipeline <command>
         [--addresses <json>]         streets and house numbers, copied next to the bundle (skipped if absent)
         [--pois <pois.json>]         hospitals, shops, cafés… for the map, copied next to the bundle (skipped if absent)
         [--overture <places.json>]   with --pois: the places only Overture Maps knows, added to them
+        [--wikidata <madeira.json>]  with --pois: their photos, Wikipedia articles and years from Wikidata
         [--stop-poles <bus-stops.json>]  with --walk: every stop put on the pavement on its buses'
                                      side of the road, at its pole where OpenStreetMap has one
         [--areas <areas.json>]       the bounds of towns and villages: where a trip to one goes
@@ -427,12 +429,24 @@ async function build(args: Args) {
       };
       const overture = JSON.parse(await readFile(overturePath, 'utf8')) as OvertureFile;
       const merged = mergePois(osm.pois, overture.places);
+      // Their photos, Wikipedia articles (a church's history) and years, from Wikidata.
+      const wikidataPath = flag(args, 'wikidata');
+      let pois = merged.pois;
+      if (wikidataPath && existsSync(wikidataPath)) {
+        const wikidata = JSON.parse(await readFile(wikidataPath, 'utf8')) as WikidataFile;
+        const wiki = attachWikidata(pois, wikidata.items);
+        pois = wiki.pois;
+        console.log(
+          `Wikidata for ${wiki.tagged + wiki.named} places (${wiki.tagged} tagged in OpenStreetMap, ` +
+            `${wiki.named} by name), ${wiki.twins} Overture twins left out`,
+        );
+      }
       await writeText(
         target,
         JSON.stringify({
           generatedAt: osm.generatedAt,
           overture: overture.release,
-          pois: merged.pois,
+          pois,
         }),
       );
       console.log(

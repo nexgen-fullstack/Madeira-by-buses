@@ -35,7 +35,7 @@ import java.io.OutputStream;
 /**
  * Hands the documents the app makes (timetables as pictures and PDFs) to the
  * person: saved at once, a picture in the gallery and a PDF in Downloads (in a
- * "Madeira by busses" folder; before Android 10, "save as" through the system
+ * "Madeira by buses" folder; before Android 10, "save as" through the system
  * file picker), the Android print dialog (which can also save a PDF) and the
  * share sheet. None of them needs a storage permission, and a web view can do
  * none of them by itself.
@@ -72,7 +72,7 @@ public class DocumentsPlugin extends Plugin {
         values.put(
             MediaStore.MediaColumns.RELATIVE_PATH,
             (picture ? Environment.DIRECTORY_PICTURES : Environment.DIRECTORY_DOWNLOADS) +
-            "/Madeira by busses"
+            "/Madeira by buses"
         );
         values.put(MediaStore.MediaColumns.IS_PENDING, 1);
         Uri uri = null;
@@ -184,9 +184,9 @@ public class DocumentsPlugin extends Plugin {
 
     /** A plain file name: no folders, nothing a file system could trip over. */
     private static String fileName(PluginCall call) {
-        String name = call.getString("fileName", "Madeira-by-busses.pdf");
+        String name = call.getString("fileName", "Madeira-by-buses.pdf");
         name = name.replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_").trim();
-        return name.isEmpty() ? "Madeira-by-busses.pdf" : name;
+        return name.isEmpty() ? "Madeira-by-buses.pdf" : name;
     }
 
     /** Feeds a finished PDF to the print framework as it is. */

@@ -281,6 +281,11 @@ function Shell() {
       }
       return false;
     }
+    // A webcam played: back to the list of webcams and the island with their signs.
+    if (where === 'webcams' && q.has('c')) {
+      backTo('webcams');
+      return true;
+    }
     // A line or a place: back where it was opened from (a place's timetable, the list).
     if ((where === 'lines' || where === 'explore' || where === 'hikes') && sub !== undefined)
       goBack(where);

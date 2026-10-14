@@ -1,16 +1,16 @@
-# Google Play: сторінка Madeira by busses
+# Google Play: сторінка Madeira by buses
 
 Усе, що просить Play Console для сторінки застосунку. Графіку збирає `python3 scripts/brand-assets.py`, скриншоти — `node scripts/screenshots.mjs play`.
 
 | Що                               | Файл / значення                                                                                                                            |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Пакет для завантаження           | `Madeira-by-busses.aab` з [останнього релізу](https://github.com/nexgen-fullstack/Madeira-by-busses/releases/latest)                       |
+| Пакет для завантаження           | `Madeira-by-buses.aab` з [останнього релізу](https://github.com/nexgen-fullstack/Madeira-by-buses/releases/latest)                       |
 | Іконка 512×512                   | [`icon-512.png`](icon-512.png)                                                                                                             |
 | Банер (feature graphic) 1024×500 | [`feature-graphic.png`](feature-graphic.png)                                                                                               |
 | Скриншоти телефона 1080×2160     | [`screenshots/`](screenshots/)                                                                                                             |
-| Назва                            | **Madeira by busses** (однакова для всіх мов)                                                                                              |
+| Назва                            | **Madeira by buses** (однакова для всіх мов)                                                                                              |
 | Категорія                        | Карти й навігація (Maps & Navigation)                                                                                                      |
-| Політика конфіденційності        | https://nexgen-fullstack.github.io/Madeira-by-busses/privacy.html                                                                          |
+| Політика конфіденційності        | https://nexgen-fullstack.github.io/Madeira-by-buses/privacy.html                                                                          |
 | Реклама                          | Немає                                                                                                                                      |
 | Безпека даних (Data safety)      | Дані не збираються й не передаються: геопозиція обробляється лише на пристрої. Шифрування передачі — так (https). Видалення — не потрібне. |
 | Вікова категорія                 | Для всіх (анкета IARC: без насильства, покупок, спілкування користувачів)                                                                  |
@@ -39,7 +39,7 @@
 
 ### English
 
-Madeira by busses — explore Madeira with ease.
+Madeira by buses — explore Madeira with ease.
 
 Plan door-to-door bus trips around Madeira on your phone, even without internet.
 
@@ -56,11 +56,11 @@ Plan door-to-door bus trips around Madeira on your phone, even without internet.
 • 11 languages: English, Português, Українська, Español, Français, Italiano, Deutsch, Nederlands, Čeština, Polski, Русский.
 • Private by design: your location never leaves your phone. No account, no ads, no tracking.
 
-Madeira by busses is an independent app, not affiliated with SIGA, Horários do Funchal, CAM, Rodoeste or the Regional Government of Madeira. Timetables come from the operators' public data.
+Madeira by buses is an independent app, not affiliated with SIGA, Horários do Funchal, CAM, Rodoeste or the Regional Government of Madeira. Timetables come from the operators' public data.
 
 ### Português
 
-Madeira by busses — explore a Madeira com facilidade.
+Madeira by buses — explore a Madeira com facilidade.
 
 Planeie viagens de autocarro porta a porta na Madeira, no telemóvel, mesmo sem internet.
 
@@ -77,11 +77,11 @@ Planeie viagens de autocarro porta a porta na Madeira, no telemóvel, mesmo sem 
 • 10 idiomas.
 • Privacidade: a sua localização nunca sai do telemóvel. Sem conta, sem publicidade, sem rastreio.
 
-O Madeira by busses é uma app independente, sem ligação à SIGA, Horários do Funchal, CAM, Rodoeste ou ao Governo Regional da Madeira. Os horários vêm dos dados públicos dos operadores.
+O Madeira by buses é uma app independente, sem ligação à SIGA, Horários do Funchal, CAM, Rodoeste ou ao Governo Regional da Madeira. Os horários vêm dos dados públicos dos operadores.
 
 ### Українська
 
-Madeira by busses — подорожуйте Мадейрою легко.
+Madeira by buses — подорожуйте Мадейрою легко.
 
 Плануйте поїздки автобусом Мадейрою «від дверей до дверей» на телефоні, навіть без інтернету.
 
@@ -98,4 +98,4 @@ Madeira by busses — подорожуйте Мадейрою легко.
 • 11 мов.
 • Приватність: геопозиція не залишає телефон. Без облікового запису, реклами й стеження.
 
-Madeira by busses — незалежний застосунок, не пов'язаний із SIGA, Horários do Funchal, CAM, Rodoeste чи урядом Мадейри. Розклади — з відкритих даних перевізників.
+Madeira by buses — незалежний застосунок, не пов'язаний із SIGA, Horários do Funchal, CAM, Rodoeste чи урядом Мадейри. Розклади — з відкритих даних перевізників.

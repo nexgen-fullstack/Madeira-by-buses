@@ -4,16 +4,16 @@
 
 ## Мета власника
 
-**Madeira by busses** — один головний застосунок з усіма автобусами Мадейри: Horários do Funchal, CAM, SIGA Rodoeste й Aerobus. Сайт і APK для телефона, потім публікація в Google Play під назвою **«Madeira by busses»** (так на логотипі; назву обрав власник, вона відрізняється від сайту-путівника «Madeira by Bus»).
+**Madeira by buses** — один головний застосунок з усіма автобусами Мадейри: Horários do Funchal, CAM, SIGA Rodoeste й Aerobus. Сайт і APK для телефона, потім публікація в Google Play під назвою **«Madeira by buses»** (так на логотипі; назву обрав власник, вона відрізняється від сайту-путівника «Madeira by Bus»).
 
 ## Стан на 10.10.2026
 
-Уся робота — в основній гілці `main` репозиторію `nexgen-fullstack/Madeira-by-busses`; з неї щоразу оновлюються:
+Уся робота — в основній гілці `main` репозиторію `nexgen-fullstack/Madeira-by-buses`; з неї щоразу оновлюються:
 
-- сайт https://nexgen-fullstack.github.io/Madeira-by-busses/ (workflow **Deploy website**);
-- застосунок https://github.com/nexgen-fullstack/Madeira-by-busses/releases/latest/download/Madeira-by-busses.apk і пакет для Google Play `Madeira-by-busses.aab` (workflow **Android app**). Застосунок сам підтягує свіжий розклад із сайту.
+- сайт https://nexgen-fullstack.github.io/Madeira-by-buses/ (workflow **Deploy website**);
+- застосунок https://github.com/nexgen-fullstack/Madeira-by-buses/releases/latest/download/Madeira-by-buses.apk і пакет для Google Play `Madeira-by-buses.aab` (workflow **Android app**). Застосунок сам підтягує свіжий розклад із сайту.
 
-Що зроблено раніше: номери ліній як на автобусі (110, «раніше 10A»), лінії й розклади від будь-якої зупинки, PDF для друку, «Краєвиди», назва й логотип «Madeira by busses», матеріали для Google Play, маршрути від будь-якої точки до будь-якої з пішими шляхами вулицями, GPS-супровід після тунелів, 24 друковані розклади головних ліній CAM і Rodoeste.
+Що зроблено раніше: номери ліній як на автобусі (110, «раніше 10A»), лінії й розклади від будь-якої зупинки, PDF для друку, «Краєвиди», назва й логотип «Madeira by buses», матеріали для Google Play, маршрути від будь-якої точки до будь-якої з пішими шляхами вулицями, GPS-супровід після тунелів, 24 друковані розклади головних ліній CAM і Rodoeste.
 
 Що зроблено 5.10.2026 (запит власника: «усі автобуси, лінії дорогами, як у Google Maps»):
 
@@ -63,7 +63,7 @@
 Що зроблено 6.10.2026, третя сесія (запит власника `docs/prompts/2026-10-06-3/PROMPT.md`: «автовокзали, адреси, карта на весь екран, назад, кольори; картинка й PDF на телефоні»):
 
 - **Автовокзали** (`isBusStation`, `Planner.changeAtStation`, правило останньої висадки в `refine`): висадка на автовокзалі, куди автобус заїжджає далі, якщо йти не більше ніж на 200 м довше і не пізніше ніж на 10 хв; пересадка на автовокзалі (до 2 км від теперішньої) на будь-який автобус звідти, якщо не пізніше ніж на 10 хв, не дорожче й без зайвих автобусів. 207 → Estacao Ribeira Brava; Funchal → Ponta do Sol: 200 + 244 на вокзалі Ribeira Brava; Funchal → Caniçal: 701 + 702 в Estação Machico. 156 випадкових поїздок: змінилося 5, жодна не дорожча, не пізніше ніж на 4 хв. Позначка «→ кінцева» тепер лише коли інший рейс їде туди, куди цей не доїжджає (207 → Boa Morte зникло).
-- **Картинка й PDF на телефоні:** нічого не працювало, бо обіцянка з плагіном Capacitor питала в нього `then` («Documents.then() is not implemented»). Знайдено через DevTools WebView на телефоні власника (збірка з `MADEIRABUS_DEBUG=1`, `adb forward … webview_devtools_remote_*`). Збереження без питань: картинка → Pictures/Madeira by busses, PDF → Download/Madeira by busses (MediaStore). На сторінці лінії — сама картинка над кнопками.
+- **Картинка й PDF на телефоні:** нічого не працювало, бо обіцянка з плагіном Capacitor питала в нього `then` («Documents.then() is not implemented»). Знайдено через DevTools WebView на телефоні власника (збірка з `MADEIRABUS_DEBUG=1`, `adb forward … webview_devtools_remote_*`). Збереження без питань: картинка → Pictures/Madeira by buses, PDF → Download/Madeira by buses (MediaStore). На сторінці лінії — сама картинка над кнопками.
 - **Адреси** (`packages/pipeline/src/addresses.ts`, команда `addresses`; `data/sources/osm/addresses.json` ≈1,3 МБ, щотижня з Overpass у `sources.yml`): вулиця → середина, номер → будинок, «Вулиця, » → номери вулиці, нема номера → найближчий того ж боку. Застосунок вантажить файл, лише коли людина почала вводити (`lib/addresses.ts`). Пошук прощає одну помилку в слові від 4 букв (дві — від 7): `nearPrefix` у `network.ts`. Місто чи село з автовокзалом до 1,5 км веде на автовокзал.
 - **Висувна панель на телефоні** (`BottomSheet.tsx`): на «Маршруті», коли задано «Куди», карта — увесь простір між шапкою й вкладками, відомості — у панелі (смужка / половина / майже весь екран), карта вписує маршрут над нею (`--map-bottom-inset`, подія `mb-map-inset`).
 - **Кнопка «Назад»** (`@capacitor/app`, `lib/back.ts`): картка лінії чи вибір на карті → варіант → список → стартовий екран; там двічі — вихід.
@@ -153,13 +153,13 @@
 
 ## Публікація в Google Play
 
-Готово: пакет `.aab` у кожному релізі, графіка, скриншоти, описи й відповіді для анкет у [branding/play/README.md](../branding/play/README.md), політика конфіденційності https://nexgen-fullstack.github.io/Madeira-by-busses/privacy.html.
+Готово: пакет `.aab` у кожному релізі, графіка, скриншоти, описи й відповіді для анкет у [branding/play/README.md](../branding/play/README.md), політика конфіденційності https://nexgen-fullstack.github.io/Madeira-by-buses/privacy.html.
 
 Лишилося власникові:
 
-1. Акаунт розробника Google Play (одноразовий внесок) і новий застосунок «Madeira by busses».
+1. Акаунт розробника Google Play (одноразовий внесок) і новий застосунок «Madeira by buses».
 2. **До першого завантаження** — власний ключ підпису: створити keystore і додати секрети `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` (README → Android). Інакше ключем завантаження стане публічний тестовий ключ.
-3. Завантажити `Madeira-by-busses.aab` спершу у внутрішнє тестування, заповнити анкети (Data safety, вікова категорія, foreground service «location» з коротким відео).
+3. Завантажити `Madeira-by-buses.aab` спершу у внутрішнє тестування, заповнити анкети (Data safety, вікова категорія, foreground service «location» з коротким відео).
 4. Опис у [branding/play/README.md](../branding/play/README.md) оновлено 7.10.2026: усі автобуси острова (HF, CAM, Rodoeste, Aerobus — з планувальника SIGA на кожен день), 38 місць «Краєвидів», прогулянки з краєвидами; абзац «CAM і Rodoeste — наступні» прибрано. Скриншоти для сторінки варто перезняти з новою вкладкою «Краєвиди» (`scripts/screenshots.mjs`).
 
 ## Корисне

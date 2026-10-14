@@ -9,8 +9,8 @@ test.beforeEach(async ({ page }) => {
 
 test('plans a trip with transfers, fares and the last bus back', async ({ page }) => {
   await page.goto('./');
-  await expect(page).toHaveTitle('Madeira by busses');
-  await expect(page.getByRole('link', { name: 'Madeira by busses' })).toBeVisible();
+  await expect(page).toHaveTitle('Madeira by buses');
+  await expect(page.getByRole('link', { name: 'Madeira by buses' })).toBeVisible();
   // The island on the whole screen, the planner in the sheet below it.
   await raiseSheet(page);
   await expect(page.getByText(/Демо-дані/)).toBeVisible();

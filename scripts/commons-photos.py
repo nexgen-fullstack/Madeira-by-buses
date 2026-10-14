@@ -22,7 +22,7 @@ from PIL import Image
 CHOICES = sys.argv[1]
 REPO = sys.argv[2] if len(sys.argv) > 2 else '.'
 API = 'https://commons.wikimedia.org/w/api.php'
-UA = 'MadeiraByBusses/1.0 (https://github.com/nexgen-fullstack/Madeira-by-busses; photos for a free bus app)'
+UA = 'MadeiraByBuses/1.0 (https://github.com/nexgen-fullstack/Madeira-by-buses; photos for a free bus app)'
 OUT = f'{REPO}/apps/web/public/photos'
 DATA = f'{REPO}/apps/web/src/lib/photos.json'
 CC0 = 'https://creativecommons.org/publicdomain/zero/1.0'

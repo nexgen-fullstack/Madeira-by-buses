@@ -19,7 +19,7 @@ import { useI18n } from '../i18n.ts';
 import { isNative } from '../lib/device.ts';
 import { clock } from '../lib/format.ts';
 import { encodePlace } from '../lib/itinerary.ts';
-import { cumulativeDistances, hasView, projectOnPolyline } from '@madeirabus/engine';
+import { hasView } from '@madeirabus/engine';
 import { WalkGuide } from '../components/WalkGuide.tsx';
 import {
   flagPoint,
@@ -60,18 +60,10 @@ export function TripView() {
     phase === 'ride' &&
     state !== undefined &&
     (state.status === 'riding' || state.status === 'prepare' || state.status === 'next');
-  // On foot, on the way walked (when the fix is near it), else on the nearest pavement;
-  // never in the houses beside the street.
+  // On foot, where the phone says the person is (on a pedestrian street beside the way
+  // drawn, in a square, in a church), not pulled onto the way; at speed, on the road.
   const placed = useSnapped(trip?.simulate ? undefined : raw, planner);
-  const position = useMemo(() => {
-    if (!raw || trip?.simulate) return raw;
-    if (walk && walk.path.length > 1) {
-      const hit = projectOnPolyline(walk.path, cumulativeDistances(walk.path), raw);
-      if (hit.offset <= Math.max(25, Math.min(raw.accuracy ?? 25, 45)))
-        return { ...raw, lat: hit.point.lat, lon: hit.point.lon };
-    }
-    return placed ?? raw;
-  }, [raw, placed, walk, trip?.simulate]);
+  const position = trip?.simulate ? raw : (placed ?? raw);
   // The bus to take, where its timetable has it while it is awaited; the bus you are in.
   const clockNow = useNow(5_000);
   const buses = useMemo<LiveBus[] | undefined>(() => {

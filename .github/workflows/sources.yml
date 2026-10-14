@@ -15,6 +15,7 @@ on:
       - scripts/pois.mjs
       - scripts/overture-places.py
       - scripts/webcams.mjs
+      - scripts/wikidata.mjs
       - .github/workflows/sources.yml
   workflow_dispatch:
 
@@ -52,6 +53,14 @@ jobs:
           if ! python scripts/overture-places.py data/sources/overture/places.json; then
             echo "::warning title=Overture places not refreshed::Keeping the previous places.json."
             git checkout HEAD -- data/sources/overture/places.json || true
+          fi
+      - name: Photos, articles and years of the places from Wikidata
+        run: |
+          # For the place cards on the map: a church's photo, its Wikipedia history, the year it
+          # was built (Wikidata CC0, no key). A busy Wikidata keeps the previous file.
+          if ! node scripts/wikidata.mjs data/sources/wikidata/madeira.json; then
+            echo "::warning title=Wikidata not refreshed::Keeping the previous madeira.json."
+            git checkout HEAD -- data/sources/wikidata/madeira.json || true
           fi
       - name: Webcams live on YouTube
         run: |

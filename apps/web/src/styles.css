@@ -1,5 +1,5 @@
 :root {
-  /* The colours of the Madeira by busses logo: its azure glow and navy road,
+  /* The colours of the Madeira by buses logo: its azure glow and navy road,
      the yellow of "Madeira" and its pin, the cyan wave under it. */
   --brand: #0b57c4;
   --brand-strong: #08449c;
@@ -2262,6 +2262,14 @@ input[type='time'],
   .app--sheet .panel--min > :not(.sheet-handle) {
     visibility: hidden;
   }
+  /* A place's card stays above the sheet, its buttons not under the sheet's handle. */
+  .app--sheet .place-card {
+    bottom: calc(min(var(--sheet-h, 50%), 55%) + 8px);
+    transition: bottom 0.24s ease;
+  }
+  .app--sheet .place-card--rich {
+    max-height: calc(100% - min(var(--sheet-h, 50%), 55%) - 76px);
+  }
   /* The map's own buttons along its bottom stay above the sheet while it is low. */
   .app--sheet .maplibregl-ctrl-bottom-left,
   .app--sheet .maplibregl-ctrl-bottom-right {
@@ -2539,6 +2547,125 @@ input[type='time'],
   height: 140px;
   object-fit: cover;
 }
+/* A place's card with its photos, its view from above and its history: as tall as it needs,
+   scrolled within when that is more than the map has. */
+.place-card--rich {
+  align-items: flex-start;
+  max-height: calc(100% - 70px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.place-card__media {
+  flex: 1 1 100%;
+  display: flex;
+  gap: 6px;
+  margin: -2px -4px 0;
+  padding: 0 4px 2px;
+  overflow-x: auto;
+  /* Photos coming in before the view from above do not push the strip aside. */
+  overflow-anchor: none;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.place-card__media::-webkit-scrollbar {
+  display: none;
+}
+.place-card__shot {
+  position: relative;
+  flex: 0 0 auto;
+  width: 168px;
+  height: 120px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  scroll-snap-align: start;
+  cursor: zoom-in;
+}
+.place-card__shot > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.place-card__shot--loading {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: place-card-shimmer 1.2s linear infinite;
+}
+@keyframes place-card-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+/* The view from above: the imagery's tiles laid side by side, the place in the middle. */
+.place-card__above {
+  cursor: pointer;
+}
+.place-card__above > img {
+  position: absolute;
+  max-width: none;
+  object-fit: fill;
+}
+.place-card__above-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #ffc400;
+  box-shadow:
+    0 0 0 4px rgb(255 196 0 / 45%),
+    0 1px 4px rgb(0 0 0 / 50%);
+}
+.place-card__tag {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 60%);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+.place-card__about {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.place-card__about h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.place-card__about h4 svg {
+  color: #c98a00;
+}
+.place-card__about p {
+  margin: 0 0 4px;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+.place-card__clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.place-card--rich .place-card__actions {
+  flex: 1 1 100%;
+  justify-content: flex-end;
+}
+.place-card--rich .place-card__text .strong {
+  white-space: normal;
+}
 .photo-view {
   position: fixed;
   inset: 0;
@@ -2564,6 +2691,25 @@ input[type='time'],
 }
 .photo-view__text a {
   color: #d8e6ff;
+}
+.photo-view__count {
+  opacity: 0.75;
+}
+/* The photo before and after, at the sides. */
+.photo-view__step {
+  position: absolute;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  margin-top: -22px;
+  color: #fff;
+  background: rgb(255 255 255 / 15%);
+}
+.photo-view__step--back {
+  left: 8px;
+}
+.photo-view__step--next {
+  right: 8px;
 }
 .photo-view__close {
   position: absolute;
@@ -4490,6 +4636,23 @@ input[type='time'],
   text-decoration: underline;
 }
 
+/* A webcam played: over the whole screen, in its middle, the map and the list dimmed behind. */
+.webcam-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  padding-top: calc(12px + env(safe-area-inset-top));
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  background: rgb(0 0 0 / 72%);
+}
+.webcam-modal__box {
+  width: min(100%, 1100px, calc((100vh - 120px) * 16 / 9));
+  min-width: min(100%, 320px);
+}
 .webcam-player {
   border-radius: var(--radius);
   overflow: hidden;
