@@ -83,6 +83,7 @@ describe('map styles', () => {
       'mb-land-desertas',
       'mb-land-porto-santo',
       'mb-satellite-far',
+      'mb-open-sea',
       'mb-satellite',
       'mb-satellite-close',
       'road',

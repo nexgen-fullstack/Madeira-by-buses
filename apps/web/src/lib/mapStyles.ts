@@ -249,7 +249,10 @@ const SATELLITE_FAR_MAX = 13;
  * Behind the imagery, the colour of its own open sea (Esri's, round Madeira): while the tiles
  * come, no other sea shows, and none where they meet.
  */
-const IMAGERY_SEA = '#0a1c2e';
+const IMAGERY_SEA = '#08487f';
+/** The open sea's blue (an Atlantic photographed from above), deep and in the shallows. */
+const OPEN_SEA = '#08487f';
+const OPEN_SEA_CLEAR = 'rgba(14, 89, 149, 0)';
 /** The sea of the plain map, a lighter turquoise. */
 const RESORT_SEA_MAP = '#8fdbe3';
 
@@ -281,6 +284,30 @@ function satelliteLayers(): LayerSpecification[] {
       source: 'mb-satellite-far',
       paint: { ...SATELLITE_FAR_PAINT },
     },
+    // The open sea in the Atlantic's blue, from the sea floor's depth: opaque out at sea, gone
+    // by the shallows, so the coast stays as photographed; faded out on zooming in.
+    {
+      id: 'mb-open-sea',
+      type: 'color-relief',
+      source: 'mb-dem',
+      maxzoom: 13,
+      paint: {
+        'color-relief-color': [
+          'interpolate',
+          ['linear'],
+          ['elevation'],
+          -400,
+          OPEN_SEA,
+          -150,
+          OPEN_SEA,
+          -40,
+          OPEN_SEA_CLEAR,
+          0,
+          OPEN_SEA_CLEAR,
+        ],
+        'color-relief-opacity': ['interpolate', ['linear'], ['zoom'], 11, 1, 13, 0],
+      },
+    },
     // Close in (tile zoom 14 to 17), over it.
     {
       id: 'mb-satellite',
@@ -306,6 +333,7 @@ function baseSources(base: BaseLayer): Record<string, SourceSpecification> {
     const tileSize = satelliteTileSize();
     return {
       ...landSources(),
+      'mb-dem': demSource(),
       'mb-satellite-far': {
         type: 'raster',
         tiles: [imagery],
