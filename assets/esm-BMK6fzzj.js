@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web-BS_MFDAE.js","./dist-vw2iei4l.js"])))=>i.map(i=>d[i]);
+import{et as e}from"./index-D8GGcdzS.js";import{registerPlugin as t}from"./dist-vw2iei4l.js";var n=t(`KeepAwake`,{web:()=>e(()=>import(`./web-BS_MFDAE.js`).then(e=>new e.KeepAwakeWeb),__vite__mapDeps([0,1]),import.meta.url)});export{n as KeepAwake};
