@@ -190,8 +190,8 @@ function Hike({
   const othersOn = useApp().settings.map.trails;
   const branches = useMemo(() => (all ? trailBranches(trail, all) : []), [trail, all]);
   const colors = useMemo(() => branchColors(branches), [branches]);
-  // The trails near it, the only others on the map with it: those met, those half an hour
-  // away on foot or by bus.
+  // The trails near it, the only others on the map with it: those met, those a quarter of an
+  // hour away on foot.
   const nearby = useMemo(
     () =>
       all
@@ -199,12 +199,11 @@ function Hike({
             ...nearbyTrails(
               trail,
               all,
-              net,
               branches.map((b) => b.trail.id),
             ),
           ]
         : undefined,
-    [trail, all, net, branches],
+    [trail, all, branches],
   );
   // The other trails added to the walk (a tap on one), kept in the address with the way.
   const keys = useMemo(() => branchKeys(branches), [branches]);

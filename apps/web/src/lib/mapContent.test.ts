@@ -12,9 +12,24 @@ import {
   RUN_WIDTH,
   travelContent,
   WALK_COLORS,
+  walkRuns,
   WAY_TURQUOISE,
   WAY_YELLOW,
 } from './mapContent.ts';
+
+describe('a walk drawn on the map', () => {
+  const p = (lon: number) => ({ lat: 32.7, lon });
+  it('leaves out the steps off the ways: from a trail start in the woods to the path', () => {
+    const path = [p(-16.9), p(-16.899), p(-16.898), p(-16.896)];
+    // Onto the path (off the ways), along it, off it again to the trail's start.
+    expect(walkRuns({ path, kerb: [-1, 0, -1] }, false)).toEqual([[p(-16.899), p(-16.898)]]);
+    expect(walkRuns({ path, kerb: [-1, -1, -1] }, false)).toEqual([]);
+    expect(walkRuns({ path, kerb: [0, 0, 0] }, false)).toEqual([path]);
+  });
+  it('draws no straight line where no way was found', () => {
+    expect(walkRuns({})).toEqual([]);
+  });
+});
 
 // Line 207 from Funchal to Ribeira Brava, and back with its stops across the road.
 const stop = (name: string, lon: number, lat = 32.65) => ({ name, lat, lon });

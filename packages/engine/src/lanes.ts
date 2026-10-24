@@ -151,7 +151,8 @@ const CORNER = 50;
  * a bus stop comes along the stop's own pavement, not across the road.
  */
 export function pavementSides(path: readonly LatLon[], kerb: readonly number[]): number[] {
-  const sides = kerb.map((k) => k);
+  // A step off the ways (to or from the place) has no pavement.
+  const sides = kerb.map((k) => Math.max(k, 0));
   const steps = kerb.length;
   if (steps === 0 || path.length !== steps + 1) return sides;
   const lat0 = path[0]!.lat;

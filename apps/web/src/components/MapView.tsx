@@ -36,6 +36,7 @@ import { luminance, readableOn } from '../lib/color.ts';
 import { decodePlace, encodePlace } from '../lib/itinerary.ts';
 import { rememberPosition } from '../lib/geolocation.ts';
 import { dropOldCaches, loadCached, PROTOCOL, trim } from '../lib/mapCache.ts';
+import { loadShore, SHORE } from '../lib/shore.ts';
 import { Snapper } from '../lib/snap.ts';
 import { placePhoto, type PlacePhoto } from '../lib/placePhoto.ts';
 import { hideLaunch } from '../lib/launch.ts';
@@ -78,6 +79,7 @@ import { LayerSwitcher } from './LayerSwitcher.tsx';
 import { LineCard, LineChooser, type LinePick } from './LineCard.tsx';
 import { MapContentContext, type PickField, type Spotlight } from './mapContext.tsx';
 import { busImage, busImageId } from './busImage.ts';
+import { CompassButton } from './compassButton.ts';
 import { MeMarker } from './meMarker.ts';
 import {
   bigStoreImage,
@@ -107,6 +109,8 @@ import { PlaceCard, type CardPlace } from './PlaceCard.tsx';
 setWorkerUrl(maplibreWorkerUrl);
 // The map's files through the phone's cache (lib/mapCache.ts).
 addProtocol(PROTOCOL, loadCached as Parameters<typeof addProtocol>[1]);
+// The close imagery by the shore only, the far picture's even sea out at sea (lib/shore.ts).
+addProtocol(SHORE, loadShore as Parameters<typeof addProtocol>[1]);
 dropOldCaches();
 
 interface PickedPlace {
@@ -1735,7 +1739,11 @@ export default function MapView({ className }: { className?: string }) {
     mapRef.current = map;
     // While developing, the map for the browser console (to put the camera where a screenshot was).
     if (import.meta.env.DEV) (window as unknown as { mbMap?: MapLibreMap }).mbMap = map;
-    map.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
+    // The zoom buttons, and the compass beside them: its ways are in CompassButton.
+    map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+    const zoomGroup = map
+      .getContainer()
+      .querySelector<HTMLElement>('.maplibregl-ctrl-top-right .maplibregl-ctrl-group');
     const locate = new GeolocateControl({
       positionOptions: { enableHighAccuracy: true },
       trackUserLocation: true,
@@ -1745,6 +1753,10 @@ export default function MapView({ className }: { className?: string }) {
     });
     // Ours: a dot with a beam the way the phone points, as in Google Maps.
     const meMarker = new MeMarker();
+    if (zoomGroup) {
+      const compass = new CompassButton(map, zoomGroup, () => meMarker.shown);
+      meMarker.onBeam = (deg) => compass.turnTo(deg);
+    }
     let snapper: Snapper | undefined;
     let shownFix = 0;
     // Where the phone was found: a trail then starts at its nearer end.
@@ -2955,11 +2967,16 @@ function fitPadding(container: HTMLElement, island: boolean) {
   };
 }
 
+/** The zoom a place is centred at: street level, where a stop's name and its buses read. */
+const CENTRE_ZOOM = 15.5;
+
 function fitTo(map: MapLibreMap, bounds: LngLatBounds, duration: number, island = false) {
   map.fitBounds(bounds, {
     padding: fitPadding(map.getContainer(), island),
     maxZoom: 15.5,
     duration,
+    // As the map is turned (north, the phone's way, or as the hand left it): a fit keeps it.
+    bearing: map.getBearing(),
   });
 }
 
@@ -2972,6 +2989,19 @@ function apply(map: MapLibreMap, content: MapContent, fit: { current: Fit }) {
   (map.getSource('mb-lines') as GeoJSONSource | undefined)?.setData(data.lines);
   (map.getSource('mb-points') as GeoJSONSource | undefined)?.setData(data.points);
   (map.getSource('mb-expressways') as GeoJSONSource | undefined)?.setData(data.expressways);
+  // Centred, not fitted: the place stays in the middle at the zoom it has (a closer one at least).
+  if (content.centre) {
+    if (content.fitKey && content.fitKey !== fit.current.key) {
+      fit.current = { key: content.fitKey };
+      map.easeTo({
+        center: [content.centre.lon, content.centre.lat],
+        zoom: Math.max(map.getZoom(), CENTRE_ZOOM),
+        padding: fitPadding(map.getContainer(), false),
+        duration: 600,
+      });
+    }
+    return;
+  }
   if (
     !content.follow &&
     content.fitKey &&

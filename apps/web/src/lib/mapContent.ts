@@ -93,6 +93,11 @@ export interface MapContent {
   fitKey?: string;
   fit?: LatLon[];
   /**
+   * A place the map is centred on, not fitted: a stop tapped stays in the middle of the screen
+   * at its zoom (or a closer one), and does not go back to the island when the sheet moves.
+   */
+  centre?: LatLon;
+  /**
    * Where the person is on a trip they follow, on foot or by bus: kept in the middle of the
    * screen as they go, the map moving with them (as in Google Maps), their dot with a beam the
    * way the phone points; `me: false` aboard, where the bus is the one shown.
@@ -243,6 +248,37 @@ export function walkPath(leg: {
   return offsetPolyline(leg.path, pavementSides(leg.path, leg.kerb));
 }
 
+/**
+ * A walk as the map draws it: only its stretches along the streets and paths. Without a way
+ * found (no `path`), or on a step off the ways (`kerb` < 0: from a place 200 m into the woods
+ * to the nearest path, say), it would be a straight dotted line looking like a trail where
+ * none is: not drawn, the walk's flags tell it is walked there.
+ */
+export function walkRuns(leg: { path?: LatLon[]; kerb?: number[] }, pavements = true): LatLon[][] {
+  const path = leg.path;
+  if (!path || path.length < 2) return [];
+  const kerb = leg.kerb;
+  if (!kerb || kerb.length !== path.length - 1) return [path];
+  // Each step on the pavement its side of the street, as the whole walk keeps them.
+  const sides = pavementSides(path, kerb);
+  const runs: LatLon[][] = [];
+  let run: { points: LatLon[]; sides: number[] } = { points: [], sides: [] };
+  const done = () => {
+    if (run.points.length > 1) {
+      runs.push(pavements ? offsetPolyline(run.points, run.sides) : run.points);
+    }
+    run = { points: [], sides: [] };
+  };
+  kerb.forEach((k, i) => {
+    if (k < 0) return done();
+    if (run.points.length === 0) run.points.push(path[i]!);
+    run.points.push(path[i + 1]!);
+    run.sides.push(sides[i]!);
+  });
+  done();
+  return runs;
+}
+
 const routeColor = (net: Network, route: number) => colorOf(net.routes[route]!);
 
 /**
@@ -280,7 +316,14 @@ export function itineraryContent(
       const path = walkPath(leg);
       const coords = [...(from ? [from] : []), ...path, ...(to ? [to] : [])];
       const color = walkColor(walk++);
-      lines.push({ coords, color, dashed: true, ...(hasView(leg) ? { view: true } : {}) });
+      // Drawn along the ways only; joined to the bus where it starts or ends on them.
+      const runs = walkRuns(leg);
+      const kerb = leg.kerb;
+      if (from && runs[0] && (!kerb || kerb[0]! >= 0)) runs[0].unshift(from);
+      if (to && runs.length > 0 && (!kerb || kerb.at(-1)! >= 0)) runs.at(-1)!.push(to);
+      for (const run of runs) {
+        lines.push({ coords: run, color, dashed: true, ...(hasView(leg) ? { view: true } : {}) });
+      }
       // A walk, as a bus, from a start flag to a chequered one in its colour, each with a
       // walker, the next walk in another colour: where the
       // journey starts on foot, where it is walked on from the bus, and where it ends; the
@@ -396,7 +439,7 @@ export function travelContent(travel: Travel, names?: { from?: string; to?: stri
     travel.mode === 'walk' ? walkColor(0) : travel.mode === 'car' ? CAR_BLUE : BIKE_GREEN;
   const lines: MapLine[] =
     travel.mode === 'walk'
-      ? [{ coords: travel.path, color, dashed: true }]
+      ? walkRuns(travel, false).map((coords) => ({ coords, color, dashed: true }))
       : [{ coords: travel.path, color, width: travel.mode === 'car' ? 7 : 5.5, arrows: true }];
   const key = (p: LatLon) => `${p.lat.toFixed(5)},${p.lon.toFixed(5)}`;
   const look: FlagLook = { mode: travel.mode, color };

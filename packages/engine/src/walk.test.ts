@@ -4,6 +4,7 @@ import {
   decodeWalkGraphData,
   DOWN_COST,
   encodeWalkGraph,
+  OFF_THE_WAYS,
   UP_COST,
   WalkGraph,
   walkKerb,
@@ -149,8 +150,8 @@ describe('WalkGraph', () => {
     });
     const r = g.route(xy(10, 5), xy(100, 45))!;
     expect(r.kerb).toHaveLength(r.path.length - 1);
-    // The step onto the road, along it on its pavement, up the steps, off them.
-    expect(r.kerb[0]).toBe(0);
+    // The step onto the road (5 m off it: not a way), along it on its pavement, up the steps.
+    expect(r.kerb[0]).toBe(OFF_THE_WAYS);
     expect(r.kerb).toContain(3.5);
     expect(r.kerb.at(-1)).toBe(0);
     expect(walkKerb(WALK_STEPS + 35 * 4)).toBe(3.5);

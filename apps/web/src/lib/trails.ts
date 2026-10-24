@@ -392,50 +392,25 @@ export function branchKeys(branches: readonly TrailBranch[]): string[] {
   });
 }
 
-/** About 30 minutes on foot (m), as the crow flies between two trails' ends. */
-const WALK_NEAR = 2000;
-/** A bus stop this close (m) to a trail's end serves it. */
-const STOP_NEAR = 800;
-/** About 30 minutes by bus (s). */
-const BUS_NEAR = 30 * 60;
+/** About 15 minutes on foot (m), as the crow flies between two trails' ends. */
+const WALK_NEAR = 1000;
 
 /**
- * The trails near `trail`, to show with it: those that meet it (`met`), and those whose
- * start or end is about half an hour from its start or end, on foot (2 km) or by bus (a
- * stop near one end, a bus there in 30 minutes, a stop near the other's end).
+ * The trails near `trail`, to show with it: those that meet it (`met`), and those whose start
+ * or end is about 15 minutes on foot from its start or end: a walk there, and a new trail.
  */
 export function nearbyTrails(
   trail: Trail,
   trails: readonly Trail[],
-  net: Network,
   met: readonly string[] = [],
 ): Set<string> {
   const ends = (t: Trail) => [startOf(t), endOf(t)];
   const mine = ends(trail);
-  // The stops a bus goes on to within half an hour from a stop near either end.
-  const reached = new Set<number>();
-  for (const p of mine) {
-    for (const { stop } of net.nearbyStops(p, STOP_NEAR)) {
-      for (const { pattern, pos } of net.stopPatterns[stop] ?? []) {
-        const pat = net.patterns[pattern]!;
-        const times = pat.profiles[0];
-        if (!times) continue;
-        const dep = times[pos * 2 + 1]!;
-        for (let k = pos; k < pat.stops.length; k++) {
-          if (times[k * 2]! - dep > BUS_NEAR) break;
-          reached.add(pat.stops[k]!);
-        }
-      }
-    }
-  }
-  const byBus = [...reached].map((s) => net.stops[s]!);
   const near = new Set<string>([trail.id, ...met]);
   for (const other of trails) {
     if (near.has(other.id)) continue;
     const theirs = ends(other);
-    const onFoot = theirs.some((a) => mine.some((b) => haversine(a, b) < WALK_NEAR));
-    const bus = !onFoot && theirs.some((a) => byBus.some((s) => haversine(a, s) < STOP_NEAR));
-    if (onFoot || bus) near.add(other.id);
+    if (theirs.some((a) => mine.some((b) => haversine(a, b) < WALK_NEAR))) near.add(other.id);
   }
   return near;
 }

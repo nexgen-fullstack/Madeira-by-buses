@@ -64,6 +64,8 @@ export const walkWay = (kind: number) => kind & 3;
 export const walkKerb = (kind: number) => (kind >> 2) / 10;
 /** The furthest a pavement is kept from the middle of a road (m): what fits in a kind. */
 export const MAX_KERB = 6.3;
+/** A walk's step off the ways (`WalkRoute.kerb`): from the place to the nearest way, or back. */
+export const OFF_THE_WAYS = -1;
 
 export interface WalkGraphData {
   /** Junctions and dead ends. */
@@ -107,7 +109,8 @@ export interface WalkRoute extends WalkDistance {
   path: LatLon[];
   /**
    * For each step of `path` (from a point to the next), how far the pavement
-   * is from the middle of the road there (m); 0 off the roads.
+   * is from the middle of the road there (m); 0 off the roads; `OFF_THE_WAYS` for
+   * the step from the place to the nearest way and from the last way to the place.
    */
   kerb: number[];
   /** Metres of it along the sea, on a promenade or past a viewpoint. */
@@ -792,7 +795,13 @@ export class WalkGraph {
         }
       }
       if (!best || !Number.isFinite(best.key)) return undefined;
-      return { ...distanceOf(best), ...this.trace(start, end, a, b) };
+      const way = this.trace(start, end, a, b);
+      // From the place to the nearest way and from the last way to the place: as the crow
+      // flies, not a way to walk (a trail's start in the woods, 200 m from the nearest path).
+      if (way.kerb.length > 0 && haversine(a, start.point) > 0.5) way.kerb[0] = OFF_THE_WAYS;
+      if (way.kerb.length > 0 && haversine(b, end.point) > 0.5)
+        way.kerb[way.kerb.length - 1] = OFF_THE_WAYS;
+      return { ...distanceOf(best), ...way };
     } finally {
       this.offView = 1;
       this.profile = WALK_PROFILE;

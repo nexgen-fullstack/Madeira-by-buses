@@ -40,7 +40,13 @@ export function StopView({ route }: { route: Route }) {
   );
   useMapContent(
     useMemo(
-      () => (group ? stopsContent([group], undefined, `stop:${ids.join('.')}`) : undefined),
+      () =>
+        group
+          ? {
+              ...stopsContent([group], undefined, `stop:${ids.join('.')}`),
+              centre: { lat: group.lat, lon: group.lon },
+            }
+          : undefined,
       [group, ids],
     ),
   );

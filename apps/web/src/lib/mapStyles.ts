@@ -2,6 +2,7 @@ import type { LayerSpecification, SourceSpecification, StyleSpecification } from
 import type { Lang } from '../i18n.ts';
 import LAND from './land.json';
 import { cachedJson, cachedUrl, fetchFirst, prefetch, tilesOver, tileUrl } from './mapCache.ts';
+import { shoreUrl } from './shore.ts';
 
 /**
  * Map styles and layers.
@@ -233,7 +234,8 @@ export const SATELLITE_PAINT = {
  * in: a vivid green against the greyer, sharper one from zoom 14. Toned to it (fitted on
  * tiles over Madeira: half the colour, a little less contrast), so a far tile standing in while
  * the close ones come, or the change of picture on zooming, does not show; the island drawn
- * from its heights is toned the same.
+ * from its heights is toned the same. Its sea is not shown (lib/shore.ts): toned, it would be
+ * grey beside the blue of the water off the shore.
  */
 export const SATELLITE_FAR_PAINT = {
   'raster-saturation': -0.35,
@@ -246,13 +248,12 @@ export const SATELLITE_FAR_PAINT = {
 const SATELLITE_FAR_MAX = 13;
 
 /**
- * Behind the imagery, the colour of its own open sea (Esri's, round Madeira): while the tiles
- * come, no other sea shows, and none where they meet.
+ * The open sea: the imagery's own, as it is round Madeira out of the shore's glitter (measured
+ * on the map, tile zooms 13 to 17), one even blue at every zoom. The imagery shows the land and
+ * the water by the shore over it (lib/shore.ts); its patchwork of captures out at sea, black
+ * squares beside blue ones, does not show. No sea is painted over the imagery.
  */
-const IMAGERY_SEA = '#08487f';
-/** The open sea's blue (an Atlantic photographed from above), deep and in the shallows. */
-const OPEN_SEA = '#08487f';
-const OPEN_SEA_CLEAR = 'rgba(14, 89, 149, 0)';
+const IMAGERY_SEA = '#091926';
 /** The sea of the plain map, a lighter turquoise. */
 const RESORT_SEA_MAP = '#8fdbe3';
 
@@ -284,30 +285,6 @@ function satelliteLayers(): LayerSpecification[] {
       source: 'mb-satellite-far',
       paint: { ...SATELLITE_FAR_PAINT },
     },
-    // The open sea in the Atlantic's blue, from the sea floor's depth: opaque out at sea, gone
-    // by the shallows, so the coast stays as photographed; faded out on zooming in.
-    {
-      id: 'mb-open-sea',
-      type: 'color-relief',
-      source: 'mb-dem',
-      maxzoom: 13,
-      paint: {
-        'color-relief-color': [
-          'interpolate',
-          ['linear'],
-          ['elevation'],
-          -400,
-          OPEN_SEA,
-          -150,
-          OPEN_SEA,
-          -40,
-          OPEN_SEA_CLEAR,
-          0,
-          OPEN_SEA_CLEAR,
-        ],
-        'color-relief-opacity': ['interpolate', ['linear'], ['zoom'], 11, 1, 13, 0],
-      },
-    },
     // Close in (tile zoom 14 to 17), over it.
     {
       id: 'mb-satellite',
@@ -333,17 +310,17 @@ function baseSources(base: BaseLayer): Record<string, SourceSpecification> {
     const tileSize = satelliteTileSize();
     return {
       ...landSources(),
-      'mb-dem': demSource(),
+      // By the shore only, as the closer ones (lib/shore.ts): out at sea, the sea's own blue.
       'mb-satellite-far': {
         type: 'raster',
-        tiles: [imagery],
+        tiles: [shoreUrl(imagery)],
         tileSize,
         maxzoom: SATELLITE_FAR_MAX,
         attribution: SATELLITE_ATTRIBUTION,
       },
       'mb-satellite': {
         type: 'raster',
-        tiles: [imagery],
+        tiles: [shoreUrl(imagery)],
         tileSize,
         minzoom: SATELLITE_FAR_MAX + 1,
         maxzoom: SATELLITE_MAX,
@@ -351,7 +328,7 @@ function baseSources(base: BaseLayer): Record<string, SourceSpecification> {
       },
       'mb-satellite-close': {
         type: 'raster',
-        tiles: [cachedUrl(SATELLITE_CLOSE_TILES)],
+        tiles: [shoreUrl(cachedUrl(SATELLITE_CLOSE_TILES))],
         tileSize,
         maxzoom: SATELLITE_CLOSE_MAX,
         attribution: SATELLITE_ATTRIBUTION,

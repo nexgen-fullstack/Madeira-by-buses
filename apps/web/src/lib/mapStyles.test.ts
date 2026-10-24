@@ -83,7 +83,6 @@ describe('map styles', () => {
       'mb-land-desertas',
       'mb-land-porto-santo',
       'mb-satellite-far',
-      'mb-open-sea',
       'mb-satellite',
       'mb-satellite-close',
       'road',
@@ -125,7 +124,8 @@ describe('map styles', () => {
   });
 
   it('leaves the imagery its own sea, and gives the plain map a turquoise one', () => {
-    // No sea painted over the photograph: it never sat right on the coast.
+    // No sea painted over the photograph: it never sat right on the coast. Out at sea the
+    // close imagery leaves the far picture's own (lib/shore.ts).
     for (const style of [overlayVector(VECTOR, 'satellite'), fallbackStyle('satellite')]) {
       expect(style.layers.some((l) => l.type === 'fill' && l.id !== 'building')).toBe(false);
       for (const l of style.layers)
@@ -201,7 +201,8 @@ describe('map styles', () => {
       // Only the map's own servers.
       expect(cached.sources.other).toEqual(style.sources.other);
       const imagery = fallbackStyle('satellite').sources['mb-satellite'] as { tiles: string[] };
-      expect(imagery.tiles[0]).toMatch(/^mbc:\/\/clarity\.maptiles\.arcgis\.com\//);
+      // Through the cache, by the shore only (lib/shore.ts, which asks the cache in turn).
+      expect(imagery.tiles[0]).toMatch(/^mbs:\/\/clarity\.maptiles\.arcgis\.com\//);
     } finally {
       vi.unstubAllGlobals();
     }

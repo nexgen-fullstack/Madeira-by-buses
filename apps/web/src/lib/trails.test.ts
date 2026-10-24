@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  encodePolyline,
-  haversine,
-  type LatLon,
-  type Network,
-  type Trail,
-} from '@madeirabus/engine';
+import { encodePolyline, haversine, type LatLon, type Trail } from '@madeirabus/engine';
 import {
   branchKeys,
   endOf,
@@ -188,28 +182,18 @@ describe('a walk with other trails added', () => {
 });
 
 describe('the trails near one chosen', () => {
-  // Two stops 20 minutes apart by bus: one by the levada's start, one 15 km east.
-  const stops = [
-    { lat: 32.7, lon: -16.9 },
-    { lat: 32.7, lon: -16.74 },
-  ];
-  const net = {
-    stops,
-    patterns: [{ stops: [0, 1], profiles: [[0, 0, 1200, 1200]] }],
-    stopPatterns: [[{ pattern: 0, pos: 0 }], [{ pattern: 0, pos: 1 }]],
-    nearbyStops: (p: LatLon, r: number) =>
-      stops.flatMap((s, stop) =>
-        haversine(p, s) < r ? [{ stop, distance: haversine(p, s) }] : [],
-      ),
-  } as unknown as Network;
   const main = trail('main', [32.7, -16.9], [32.7, -16.89]);
-  const walk = trail('walk', [32.71, -16.88], [32.72, -16.87]);
+  // About 780 m from the levada's end: a quarter of an hour on foot.
+  const walk = trail('walk', [32.707, -16.89], [32.72, -16.87]);
+  // About 1.5 km from its end: too far to walk to in a quarter of an hour.
+  const half = trail('half', [32.714, -16.89], [32.72, -16.86]);
+  // Near a bus stop, but not on foot: a bus does not bring it near any more.
   const bus = trail('bus', [32.701, -16.741], [32.71, -16.73]);
   const far = trail('far', [32.8, -17.2], [32.81, -17.21]);
   const met = trail('met', [32.9, -17.3], [32.91, -17.31]);
-  it('are those met, half an hour on foot, or half an hour by bus; none of the rest', () => {
-    const near = nearbyTrails(main, [main, walk, bus, far, met], net, ['met']);
-    expect([...near].sort()).toEqual(['bus', 'main', 'met', 'walk']);
+  it('are those met or a quarter of an hour on foot; none of the rest', () => {
+    const near = nearbyTrails(main, [main, walk, half, bus, far, met], ['met']);
+    expect([...near].sort()).toEqual(['main', 'met', 'walk']);
   });
 });
 

@@ -29,6 +29,8 @@ export class MeMarker {
   private course?: number;
   private riding = false;
   private last?: LatLon & { t: number };
+  /** Told the way the beam points (degrees clockwise from north) as it turns. */
+  onBeam?: (deg: number) => void;
 
   constructor() {
     this.el.className = 'me-marker';
@@ -79,6 +81,9 @@ export class MeMarker {
     const h =
       this.riding && this.course !== undefined ? this.course : (this.compass ?? this.course);
     this.el.classList.toggle('me-marker--beam', h !== undefined);
-    if (h !== undefined) this.marker.setRotation(h);
+    if (h !== undefined) {
+      this.marker.setRotation(h);
+      this.onBeam?.(h);
+    }
   }
 }
