@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-10-19T08:04:34.585Z",
+  "fetchedAt": "2026-10-26T08:07:34.469Z",
   "seeds": [
     "https://siga.madeira.gov.pt/",
     "https://siga.madeira.gov.pt/public/index.php/language/en",
@@ -14,7 +14,22 @@
     "feedInfo": "feed_type,feed_publisher_name,feed_publisher_url,feed_lang,feed_start_date,feed_end_date,feed_version,feed_desc,feed_remarks,feed_contact_email,feed_contact_url\r\n,HF,https://www.horariosdofunchal.pt/,pt,20260909,20261130,202609091923,,,geral@horariosdofunchal.pt,https://www.horariosdofunchal.pt/"
   },
   "osm": {
-    "error": "Error: https://overpass-api.de/api/interpreter: HTTP 502; https://overpass.kumi.systems/api/interpreter: HTTP 500; https://overpass.private.coffee/api/interpreter: HTTP 500; https://maps.mail.ru/osm/tools/overpass/api/interpreter: HTTP 504"
+    "routeRelations": 225,
+    "routeMasters": 2,
+    "operators": [
+      "CAM",
+      "RODOESTE",
+      "Rodoeste",
+      "SAM",
+      "HF",
+      "HF - Urbano",
+      "Horários do Funchal",
+      "SIGA"
+    ],
+    "stops": 4058,
+    "places": 3272,
+    "trails": 3030,
+    "pois": 7489
   },
   "web": {
     "pages": 415,
@@ -36,16 +51,16 @@
         "error": "TypeError: fetch failed"
       },
       {
-        "url": "https://siga.madeira.gov.pt/tiim",
+        "url": "https://siga.madeira.gov.pt/giro/tarifarios",
         "bytes": 186400,
         "sha256": "0b0cff66504a0b8c",
-        "text": "pdf-text/siga_madeira_gov_pt_tiim.txt"
+        "text": "pdf-text/siga_madeira_gov_pt_giro_tarifarios.txt"
       },
       {
-        "url": "https://siga.madeira.gov.pt/index.php/tiim",
+        "url": "https://siga.madeira.gov.pt/index.php/giro/tarifarios",
         "bytes": 186400,
         "sha256": "0b0cff66504a0b8c",
-        "text": "pdf-text/siga_madeira_gov_pt_index_php_tiim.txt"
+        "text": "pdf-text/siga_madeira_gov_pt_index_php_giro_tarifarios.txt"
       },
       {
         "url": "https://siga.madeira.gov.pt/noticias/download/2181",
