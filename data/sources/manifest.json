@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-10-26T08:07:34.469Z",
+  "fetchedAt": "2026-11-02T09:56:21.691Z",
   "seeds": [
     "https://siga.madeira.gov.pt/",
     "https://siga.madeira.gov.pt/public/index.php/language/en",
@@ -9,27 +9,12 @@
   ],
   "hf": {
     "url": "https://www.horariosdofunchal.pt/googletransit.zip",
-    "bytes": 3696546,
-    "sha256": "d07e6c9cf9b13357",
-    "feedInfo": "feed_type,feed_publisher_name,feed_publisher_url,feed_lang,feed_start_date,feed_end_date,feed_version,feed_desc,feed_remarks,feed_contact_email,feed_contact_url\r\n,HF,https://www.horariosdofunchal.pt/,pt,20260909,20261130,202609091923,,,geral@horariosdofunchal.pt,https://www.horariosdofunchal.pt/"
+    "bytes": 3933994,
+    "sha256": "3435d3938c1b3623",
+    "feedInfo": "feed_type,feed_publisher_name,feed_publisher_url,feed_lang,feed_start_date,feed_end_date,feed_version,feed_desc,feed_remarks,feed_contact_email,feed_contact_url\r\n,HF,https://www.horariosdofunchal.pt/,pt,20260909,20270830,202610261706,,,geral@horariosdofunchal.pt,https://www.horariosdofunchal.pt/"
   },
   "osm": {
-    "routeRelations": 225,
-    "routeMasters": 2,
-    "operators": [
-      "CAM",
-      "RODOESTE",
-      "Rodoeste",
-      "SAM",
-      "HF",
-      "HF - Urbano",
-      "Horários do Funchal",
-      "SIGA"
-    ],
-    "stops": 4058,
-    "places": 3272,
-    "trails": 3030,
-    "pois": 7489
+    "error": "Error: https://overpass-api.de/api/interpreter: HTTP 502; https://overpass.kumi.systems/api/interpreter: HTTP 502; https://overpass.private.coffee/api/interpreter: HTTP 502; https://maps.mail.ru/osm/tools/overpass/api/interpreter: HTTP 504"
   },
   "web": {
     "pages": 415,

@@ -1,5 +1,5 @@
 {
- "fetchedAt": "2026-10-26T08:44:17.109Z",
+ "fetchedAt": "2026-11-02T10:09:57.903Z",
  "live": {
   "seixal": {
    "video": "JcHZCL9Up20",
@@ -25,6 +25,22 @@
    "video": "BuL1tgahkXM",
    "title": "Webcam Live @ Ponta do Sol - Madeira / Portal Netmadeira"
   },
+  "mw-marina-2": {
+   "video": "UgWqCHitq-Q",
+   "title": "🔴 LIVE: Funchal Marina Webcam 2 Madeira Island | Madeira-Web"
+  },
+  "mw-marina-1": {
+   "video": "mZFDQH7J4kE",
+   "title": "🔴 LIVE: Funchal Marina Webcam 1 Madeira Island | Madeira-Web"
+  },
+  "mw-arriaga": {
+   "video": "xs6_gds5Z1I",
+   "title": "🔴 Ritz Madeira Live Webcam, Avenida Arriaga, Funchal, Madeira Island"
+  },
+  "mw-airport": {
+   "video": "AhSeqyMYJkw",
+   "title": "🔴 LIVE Planespotting Madeira Airport by Cassiano's Snack Bar | Madeira-Web"
+  },
   "mw-calheta": {
    "video": "4dbXjCzI5FU",
    "title": "🔴 LIVE: Calheta Beach Webcam @ Mudas Museum | Madeira-Web"
@@ -36,10 +52,6 @@
   "mw-reis-magos": {
    "video": "PujA-AJpbek",
    "title": "🔴 LIVE Cam: Praia dos Reis Magos Beach, Caniço | Madeira-Web"
-  },
-  "mw-airport": {
-   "video": "MXpNSJWuqa0",
-   "title": "🔴 LIVE Cam: Madeira Island Airport by Só Espeto | Madeira-Web"
   }
  }
 }
