@@ -2263,6 +2263,10 @@ input[type='time'],
   .app--sheet .panel--dragging {
     transition: none;
   }
+  /* Coming up by itself to a place's photo once its way is drawn: gently, in a second. */
+  .app--sheet .panel--rising {
+    transition: height 1s cubic-bezier(0.22, 1, 0.36, 1);
+  }
   /* Down to its handle: the map takes the screen, nothing of the screen peeks out. */
   .app--sheet .panel--min {
     overflow: hidden;

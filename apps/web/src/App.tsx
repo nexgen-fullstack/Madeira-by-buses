@@ -257,6 +257,27 @@ function Shell() {
     window.addEventListener('mb-sheet-down', down);
     return () => window.removeEventListener('mb-sheet-down', down);
   }, [sheetMode, setSnap]);
+  // A place's way there drawn: the sheet, still down, comes gently up to the place's photo and
+  // name in a second; from there the person pulls it on.
+  const [rising, setRising] = useState(false);
+  const snapNow = useRef(sheet.snap);
+  snapNow.current = sheet.snap;
+  useEffect(() => {
+    if (!sheetMode) return;
+    let done: number | undefined;
+    const up = () => {
+      if (snapNow.current !== 'min') return;
+      setRising(true);
+      setSnap('peek');
+      window.clearTimeout(done);
+      done = window.setTimeout(() => setRising(false), 1100);
+    };
+    window.addEventListener('mb-sheet-peek', up);
+    return () => {
+      window.removeEventListener('mb-sheet-peek', up);
+      window.clearTimeout(done);
+    };
+  }, [sheetMode, setSnap]);
   // The map keeps the route clear of the sheet once it rests.
   const inset = sheetMode ? snapInset(sheet.snap, sheet.areaHeight, peek) : 0;
   useEffect(() => {
@@ -364,8 +385,8 @@ function Shell() {
         </Suspense>
         <main
           className={`panel${sheetMode ? ' panel--sheet' : ''}${sheet.dragging ? ' panel--dragging' : ''}${
-            sheetMode && sheet.snap === 'min' && !sheet.dragging ? ' panel--min' : ''
-          }`}
+            rising && !sheet.dragging ? ' panel--rising' : ''
+          }${sheetMode && sheet.snap === 'min' && !sheet.dragging ? ' panel--min' : ''}`}
           ref={panel}
           onFocus={(e) => {
             // Typing a place: the sheet makes room for the list of places.

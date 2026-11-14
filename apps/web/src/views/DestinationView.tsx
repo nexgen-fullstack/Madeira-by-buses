@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   CalendarClock,
@@ -229,6 +229,18 @@ export function DestinationView({ d, route }: { d: Destination; route: Route }) 
       };
     }, [net, d, results, selectedIt, travelShown, origin?.name]),
   );
+
+  // The way there drawn on the map (or none found): once the map has gone to it, the place's
+  // photo, name and "start" come up from under the map, once for the place.
+  const shownWay = !!travelShown || !!results?.some((r) => r.rides > 0);
+  const searched = shownWay || (!loading && found !== undefined) || !!geo.error;
+  const risen = useRef(false);
+  useEffect(() => {
+    if (!searched || risen.current) return;
+    risen.current = true;
+    const id = window.setTimeout(() => window.dispatchEvent(new Event('mb-sheet-peek')), 650);
+    return () => window.clearTimeout(id);
+  }, [searched]);
 
   if (selectedIt) {
     return (
