@@ -211,7 +211,11 @@ function Shell() {
       (tabs.current?.offsetHeight ?? 0),
     [],
   );
-  const searchKey = [route.path.join('/'), ...['from', 'to', 'i'].map((k) => route.query.get(k))]
+  // The weather of another place or spot chosen (`p`): the sheet back up to where it rests.
+  const searchKey = [
+    route.path.join('/'),
+    ...['from', 'to', 'i', 'p'].map((k) => route.query.get(k)),
+  ]
     .map((k) => k ?? '')
     .join('|');
   const rest = sheetRest(route);

@@ -106,19 +106,18 @@ export function WeatherView({ route }: { route: Route }) {
     () =>
       forecasts && {
         lines: [],
-        // The yellow pin on the place chosen; the map goes to a place chosen in the list.
+        // The yellow pin on the place chosen; the map goes to a place or a spot chosen, kept
+        // in the window above the sheet as it comes back up.
         points: [{ lat: place.lat, lon: place.lon, kind: 'destination' as const }],
-        ...(asked && !spot
+        ...(asked
           ? {
-              fitKey: `weather:${place.id}`,
+              fitKey: `weather:${placeId}`,
               fit: [
                 { lat: place.lat - 0.025, lon: place.lon - 0.03 },
                 { lat: place.lat + 0.025, lon: place.lon + 0.03 },
               ],
             }
-          : spot
-            ? {}
-            : { fitKey: 'weather', fit: WEATHER_PLACES.filter((p) => p.area !== 'MPS') }),
+          : { fitKey: 'weather', fit: WEATHER_PLACES.filter((p) => p.area !== 'MPS') }),
         // Any spot tapped: its weather.
         onMapTap: (at) =>
           navigate('weather', {
