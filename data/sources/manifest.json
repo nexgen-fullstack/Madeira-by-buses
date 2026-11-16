@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-11-09T10:17:46.465Z",
+  "fetchedAt": "2026-11-16T10:08:56.677Z",
   "seeds": [
     "https://siga.madeira.gov.pt/",
     "https://siga.madeira.gov.pt/public/index.php/language/en",
@@ -17,7 +17,7 @@
     "error": "Error: https://overpass-api.de/api/interpreter: HTTP 502; https://overpass.kumi.systems/api/interpreter: HTTP 504; https://overpass.private.coffee/api/interpreter: HTTP 504; https://maps.mail.ru/osm/tools/overpass/api/interpreter: HTTP 504"
   },
   "web": {
-    "pages": 421,
+    "pages": 423,
     "pdfs": [
       {
         "url": "https://siga.madeira.gov.pt/img/aerobus/aerobus_1.pdf",
@@ -27,8 +27,8 @@
       },
       {
         "url": "https://siga.madeira.gov.pt/img/aerobus/aerobus_2.pdf",
-        "bytes": 2104793,
-        "sha256": "57723233909da396",
+        "bytes": 472397,
+        "sha256": "abb89dadbd8840d8",
         "text": "pdf-text/siga_madeira_gov_pt_img_aerobus_aerobus_2_pdf.txt"
       },
       {
@@ -376,11 +376,11 @@
         "bbox": "pdf-bbox/siga_madeira_gov_pt_storage_horarios_pdf_B13DE4E4_54CE_4B4B_9480_E14F39A8E99B_pdf.html"
       },
       {
-        "url": "https://siga.madeira.gov.pt/storage/horarios_pdf/B0EA67C3-ECA9-4322-BBD7-0374E8E447C5.pdf",
-        "bytes": 94333,
-        "sha256": "ea8dc119baca466d",
-        "text": "pdf-text/siga_madeira_gov_pt_storage_horarios_pdf_B0EA67C3_ECA9_4322_BBD7_0374E8E447C5_pdf.txt",
-        "bbox": "pdf-bbox/siga_madeira_gov_pt_storage_horarios_pdf_B0EA67C3_ECA9_4322_BBD7_0374E8E447C5_pdf.html"
+        "url": "https://siga.madeira.gov.pt/storage/horarios_pdf/E24AE59D-33FF-4342-91D6-BD395CBCF34A.pdf",
+        "bytes": 89347,
+        "sha256": "09fbcbd3c0cc73b6",
+        "text": "pdf-text/siga_madeira_gov_pt_storage_horarios_pdf_E24AE59D_33FF_4342_91D6_BD395CBCF34A_pdf.txt",
+        "bbox": "pdf-bbox/siga_madeira_gov_pt_storage_horarios_pdf_E24AE59D_33FF_4342_91D6_BD395CBCF34A_pdf.html"
       },
       {
         "url": "https://siga.madeira.gov.pt/storage/horarios_pdf/4DE51252-FEC6-4017-82B5-72CC10B464A2.pdf",
@@ -776,23 +776,38 @@
       },
       {
         "url": "https://siga.madeira.gov.pt/storage/horarios_pdf/sam_202.pdf",
-        "error": "TimeoutError: The operation was aborted due to timeout"
+        "bytes": 2371243,
+        "sha256": "339f228f6c19a08d",
+        "text": "pdf-text/siga_madeira_gov_pt_storage_horarios_pdf_sam_202_pdf.txt",
+        "bbox": "pdf-bbox/siga_madeira_gov_pt_storage_horarios_pdf_sam_202_pdf.html"
       },
       {
         "url": "https://siga.madeira.gov.pt/storage/horarios_pdf/sam_206.pdf",
-        "error": "TimeoutError: The operation was aborted due to timeout"
+        "bytes": 2401386,
+        "sha256": "9059962418e235dc",
+        "text": "pdf-text/siga_madeira_gov_pt_storage_horarios_pdf_sam_206_pdf.txt",
+        "bbox": "pdf-bbox/siga_madeira_gov_pt_storage_horarios_pdf_sam_206_pdf.html"
       },
       {
         "url": "https://siga.madeira.gov.pt/storage/horarios_pdf/sam_207.pdf",
-        "error": "TimeoutError: The operation was aborted due to timeout"
+        "bytes": 2373363,
+        "sha256": "f8a1c1e8f312ea8e",
+        "text": "pdf-text/siga_madeira_gov_pt_storage_horarios_pdf_sam_207_pdf.txt",
+        "bbox": "pdf-bbox/siga_madeira_gov_pt_storage_horarios_pdf_sam_207_pdf.html"
       },
       {
         "url": "https://siga.madeira.gov.pt/storage/horarios_pdf/sam_78.pdf",
-        "error": "TimeoutError: The operation was aborted due to timeout"
+        "bytes": 2425129,
+        "sha256": "76d93d5b32151b9b",
+        "text": "pdf-text/siga_madeira_gov_pt_storage_horarios_pdf_sam_78_pdf.txt",
+        "bbox": "pdf-bbox/siga_madeira_gov_pt_storage_horarios_pdf_sam_78_pdf.html"
       },
       {
         "url": "https://siga.madeira.gov.pt/storage/horarios_pdf/6F124271-558F-4E2C-A067-DFC4E32AC70E.pdf",
-        "error": "TimeoutError: The operation was aborted due to timeout"
+        "bytes": 296198,
+        "sha256": "9e3adb2626bcfd05",
+        "text": "pdf-text/siga_madeira_gov_pt_storage_horarios_pdf_6F124271_558F_4E2C_A067_DFC4E32AC70E_pdf.txt",
+        "bbox": "pdf-bbox/siga_madeira_gov_pt_storage_horarios_pdf_6F124271_558F_4E2C_A067_DFC4E32AC70E_pdf.html"
       },
       {
         "url": "https://siga.madeira.gov.pt/storage/horarios_pdf/09E84134-213E-4827-96B7-3DA6B1DFD935.pdf",

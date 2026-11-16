@@ -18,9 +18,9 @@ SERVIÇO URBANO | URBAN SERVICE
         TRAV Saudade, 2A (1316)
                Rua do Pina (1318)
                                                                                     14:30            14:15
-      Rua Elias Garcia, CRSS (181)       Centro C Bom Jesus (921)                   17:40            14:40
-                Tribunal, D (150A)       R 31 Janeiro Finanças (9C)                 18:15            18:00
-                      Esfera (152)       Casa STO António (9B)
+      Rua Elias Garcia, CRSS (181)       Centro C Bom Jesus (921)                   16:00            14:50
+                Tribunal, D (150A)       R 31 Janeiro Finanças (9C)                 17:40            16:30
+                      Esfera (152)       Casa STO António (9B)                      18:15            18:00
                   Alfândega (154)        Alfândega (154)
 
 
@@ -30,5 +30,5 @@ SERVIÇO URBANO | URBAN SERVICE
      Starting point      Terminus       Bus stop         Bus stop Code
 
 Dia 25 de Dezembro: Não se efetuam viagens. Dias 24 e 31 de Dezembro, 3ª feira de Carnaval e 5ª feira Santa: Não se efetua o serviço nesta carreira.
-On 25th December: No service. On 24th and 31st December, Mardi Gras and the Thursday before Easter: No service on this route.                                  DE/HF - Janeiro 2021
+On 25th December: No service. On 24th and 31st December, Mardi Gras and the Thursday before Easter: No service on this route.                                   DE/HF - 16.11.2026
 
